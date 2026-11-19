@@ -630,6 +630,10 @@ class SettingsStore(context: Context) {
         dataStore.edit { prefs -> prefs[SERVER_RAW_PORT] = port.coerceIn(1, 65535) }
     }
 
+    suspend fun saveWorkersPerHash(workers: Int) {
+        dataStore.edit { prefs -> prefs[WORKERS_PER_HASH] = workers.coerceIn(1, 36) }
+    }
+
     suspend fun saveTurnTransport(transport: String) {
         val normalized = normalizeTurnTransport(transport)
         dataStore.edit { prefs ->

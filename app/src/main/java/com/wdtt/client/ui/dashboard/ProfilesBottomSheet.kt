@@ -63,7 +63,7 @@ fun ProfilesBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = "Локации и серверы",
                         style = MaterialTheme.typography.titleLarge,
@@ -76,26 +76,31 @@ fun ProfilesBottomSheet(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = {
-                            if (isSyncing) return@IconButton
-                            scope.launch {
-                                isSyncing = true
-                                var updatedCount = 0
-                                for (sub in subscriptions) {
-                                    val res = profilesStore.refreshSubscription(sub.id)
-                                    if (res.isSuccess) updatedCount += res.getOrDefault(0)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (subscriptions.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                if (isSyncing) return@IconButton
+                                scope.launch {
+                                    isSyncing = true
+                                    var updatedCount = 0
+                                    for (sub in subscriptions) {
+                                        val res = profilesStore.refreshSubscription(sub.id)
+                                        if (res.isSuccess) updatedCount += res.getOrDefault(0)
+                                    }
+                                    isSyncing = false
+                                    Toast.makeText(context, "Обновлено серверов: $updatedCount", Toast.LENGTH_SHORT).show()
                                 }
-                                isSyncing = false
-                                Toast.makeText(context, "Обновлено серверов: $updatedCount", Toast.LENGTH_SHORT).show()
                             }
-                        }
-                    ) {
-                        if (isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Обновить подписки")
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Filled.Refresh, contentDescription = "Обновить подписки")
+                            }
                         }
                     }
 

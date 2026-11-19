@@ -17,8 +17,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,7 +37,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val notificationLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        checkAndRequestBattery()
+        // Notification permission handled
     }
 
     @Volatile
@@ -68,8 +71,16 @@ class MainActivity : ComponentActivity() {
         if (TunnelManager.running.value || TunnelManager.isConnecting.value) {
             TunnelControl.stop(applicationContext)
         } else {
-            prepareVpnThen {
-                TunnelControl.startFromSavedSettings(applicationContext)
+            lifecycleScope.launch {
+                val store = SettingsStore(applicationContext)
+                val peer = store.peer.first()
+                if (peer.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Сначала добавьте подписку или выберите сервер", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                prepareVpnThen {
+                    TunnelControl.startFromSavedSettings(applicationContext)
+                }
             }
         }
     }
@@ -170,6 +181,15 @@ class MainActivity : ComponentActivity() {
             val themePalette by settingsStore.themePalette.collectAsStateWithLifecycle(initialValue = "indigo")
 
             var pendingRelease by remember { mutableStateOf<AppReleaseInfo?>(null) }
+            var showBatteryDialog by rememberSaveable { mutableStateOf(false) }
+
+            LaunchedEffect(Unit) {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                    kotlinx.coroutines.delay(1000)
+                    showBatteryDialog = true
+                }
+            }
 
             LaunchedEffect(Unit) {
                 try {
@@ -196,6 +216,35 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (showBatteryDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showBatteryDialog = false },
+                        icon = { Icon(Icons.Filled.BatteryAlert, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        title = { Text("Фоновый режим работы") },
+                        text = {
+                            Text("Чтобы система не отключала Moschata VPN при блокировке экрана и не разрывала соединение, отключите ограничение батареи (выберите «Нет ограничений»).")
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showBatteryDialog = false
+                                try {
+                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                        data = Uri.parse("package:$packageName")
+                                    }
+                                    batteryLauncher.launch(intent)
+                                } catch (_: Exception) {}
+                            }) {
+                                Text("Настроить")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showBatteryDialog = false }) {
+                                Text("Позже")
+                            }
+                        }
+                    )
+                }
+
                 pendingRelease?.let { release ->
                     AppUpdateDialog(
                         release = release,
@@ -212,23 +261,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                checkAndRequestBattery()
             }
-        } else {
-            checkAndRequestBattery()
-        }
-    }
-
-    private fun checkAndRequestBattery() {
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            try {
-                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                batteryLauncher.launch(intent)
-            } catch (_: Exception) {}
         }
     }
 }

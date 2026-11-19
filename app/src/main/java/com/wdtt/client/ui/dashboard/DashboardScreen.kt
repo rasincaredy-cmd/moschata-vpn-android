@@ -52,8 +52,10 @@ fun DashboardScreen(
     val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
     val currentPeer by settingsStore.peer.collectAsStateWithLifecycle(initialValue = "")
     val currentHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
+    val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
 
     val isBypass = currentHashes.isNotBlank() || currentPeer.contains(":5600")
+    val hasActiveServer = (currentProfileName.isNotBlank() || currentPeer.isNotBlank()) && profiles.isNotEmpty()
 
     val visualState = when {
         tunnelConnecting || tunnelReconnecting -> ConnectionVisualState.CONNECTING
@@ -180,7 +182,14 @@ fun DashboardScreen(
             ) {
                 HeroConnectButton(
                     visualState = visualState,
-                    onClick = onToggleConnection
+                    onClick = {
+                        if (!hasActiveServer && !tunnelRunning) {
+                            Toast.makeText(context, "Сначала добавьте подписку или выберите сервер", Toast.LENGTH_SHORT).show()
+                            showProfilesSheet = true
+                        } else {
+                            onToggleConnection()
+                        }
+                    }
                 )
 
                 Column(
@@ -245,17 +254,21 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("🇳🇱", fontSize = 22.sp)
+                        Text(if (hasActiveServer) "🇳🇱" else "🌐", fontSize = 22.sp)
                         Column {
                             Text(
-                                text = currentProfileName.ifBlank { "Нидерланды (Moschata VPN)" },
+                                text = if (hasActiveServer) currentProfileName.ifBlank { "Сервер WireGuard" } else "Сервер не выбран",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (isBypass) "Режим: Обход БС (VK TURN) ⚡" else "Режим: Скоростной WireGuard",
+                                text = if (hasActiveServer) {
+                                    if (isBypass) "Режим: Обход БС (VK TURN) ⚡" else "Режим: Скоростной WireGuard"
+                                } else {
+                                    "Нажмите, чтобы добавить сервер или подписку"
+                                },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary
+                                color = if (hasActiveServer && isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary
                             )
                         }
                     }

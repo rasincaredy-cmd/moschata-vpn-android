@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.AppLinks
 import com.wdtt.client.BuildConfig
@@ -42,6 +45,15 @@ fun SettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
+    val connectionMode by settingsStore.connectionMode.collectAsStateWithLifecycle(initialValue = SettingsStore.CONNECTION_MODE_VPN)
+    val workersPerHash by settingsStore.workersPerHash.collectAsStateWithLifecycle(initialValue = 9)
+    val turnTransport by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = "udp")
+    val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
+    val peer by settingsStore.peer.collectAsStateWithLifecycle(initialValue = "")
+
+    val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
+    var isIgnoringBattery by remember { mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName)) }
+
     var isCheckingUpdates by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -127,7 +139,7 @@ fun SettingsSheet(
                 }
             }
 
-            // Секция 3: Опции подключения (Для опытных)
+            // Секция 3: Опции подключения
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -164,15 +176,47 @@ fun SettingsSheet(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                    // Заводские порты
+                    // Фоновая работа и батарея
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                try {
+                                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Фоновый режим (Батарея)", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = if (isIgnoringBattery) "Ограничения отключены (фоновый режим активен) ✓" else "Включена оптимизация (нажмите, чтобы разрешить фоновую работу) ⚠️",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isIgnoringBattery) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            )
+                        }
+                        Icon(
+                            Icons.Filled.BatteryChargingFull,
+                            contentDescription = null,
+                            tint = if (isIgnoringBattery) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // Активный сервер
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "Сервер Нидерланды (по умолчанию)",
+                            text = if (currentProfileName.isNotBlank()) "Сервер: $currentProfileName" else "Сервер не выбран",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            "WireGuard: порт 585 • DTLS: 56000 • RAW: 56003",
+                            text = if (peer.isNotBlank()) "Адрес узла: $peer" else "Добавьте персональную подписку во вкладке «Локации и серверы»",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -180,7 +224,128 @@ fun SettingsSheet(
                 }
             }
 
-            // Секция 4: Диагностика и обновление
+            // Секция 4: Параметры обхода Белого Списка (qWDTT)
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Column {
+                        Text(
+                            text = "Обход Белого Списка (qWDTT)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Настройки маскировки интернет-трафика под звонки VK",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // 1. Режим протокола обхода (Raw / WireGuard)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Режим протокола", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
+                                onClick = {
+                                    scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_VPN) }
+                                },
+                                label = { Text("WireGuard (56000)") }
+                            )
+                            FilterChip(
+                                selected = connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN,
+                                onClick = {
+                                    scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_RAWTUN) }
+                                },
+                                label = { Text("Raw IP (56003)") }
+                            )
+                        }
+                        Text(
+                            text = if (connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN)
+                                "Raw IP: сырые пакеты напрямую в TUN без WireGuard. Максимальная маскировка при фильтрации."
+                            else
+                                "WireGuard: скоростной шифрованный туннель через VK TURN (DTLS). Быстрый стандартный режим.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 2. Мощность (число параллельных потоков)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Мощность обхода", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = "$workersPerHash потоков",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Slider(
+                            value = workersPerHash.toFloat(),
+                            onValueChange = { newVal ->
+                                scope.launch { settingsStore.saveWorkersPerHash(newVal.toInt()) }
+                            },
+                            valueRange = 1f..27f,
+                            steps = 25,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "Количество параллельных потоков VK TURN. 9 — стандартный баланс, увеличивайте при потерях пакетов.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 3. Транспорт VK TURN (UDP / TCP)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Транспорт VK TURN", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = turnTransport != SettingsStore.TURN_TRANSPORT_TCP,
+                                onClick = {
+                                    scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_UDP) }
+                                },
+                                label = { Text("UDP (Быстрый)") }
+                            )
+                            FilterChip(
+                                selected = turnTransport == SettingsStore.TURN_TRANSPORT_TCP,
+                                onClick = {
+                                    scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_TCP) }
+                                },
+                                label = { Text("TCP / 443 (Надёжный)") }
+                            )
+                        }
+                        Text(
+                            text = if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP)
+                                "TCP (443): передача трафика по TCP, полезно если оператор глушит нестандартный UDP."
+                            else
+                                "UDP: минимальный пинг и задержка при обычном обходе Белого Списка.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Секция 5: Диагностика и обновление
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -232,12 +397,17 @@ fun SettingsSheet(
                             if (isCheckingUpdates) return@OutlinedButton
                             scope.launch {
                                 isCheckingUpdates = true
-                                val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
-                                isCheckingUpdates = false
-                                if (release != null && isNewerVersion("v${BuildConfig.VERSION_NAME}", release.versionTag, includePrerelease = false)) {
-                                    Toast.makeText(context, "Доступно обновление: ${release.versionTag}!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(context, "У вас установлена последняя версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                                try {
+                                    val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
+                                    isCheckingUpdates = false
+                                    if (release != null && isNewerVersion("v${BuildConfig.VERSION_NAME}", release.versionTag, includePrerelease = false)) {
+                                        Toast.makeText(context, "Доступна новая версия: ${release.versionTag}", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        Toast.makeText(context, "У вас установлена последняя версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    isCheckingUpdates = false
+                                    Toast.makeText(context, "Ошибка проверки: ${e.message}", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -247,9 +417,9 @@ fun SettingsSheet(
                         if (isCheckingUpdates) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(8.dp))
-                            Text("Проверка…")
+                            Text("Проверка обновлений…")
                         } else {
-                            Icon(Icons.Filled.Update, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Проверить обновление (v${BuildConfig.VERSION_NAME})")
                         }

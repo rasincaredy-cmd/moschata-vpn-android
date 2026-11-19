@@ -13,6 +13,7 @@ import javax.net.ssl.X509TrustManager
 
 data class ProbeResult(
     val url: String,
+    val title: String,
     val isSuccess: Boolean,
     val httpCode: Int = 0,
     val latencyMs: Long = 0L,
@@ -32,7 +33,7 @@ data class DetectionReport(
  * Проверяет доступность независимых внешних сервисов против социально значимых ресурсов РФ.
  */
 class WhiteListDetector(
-    private val probeTimeoutMs: Long = 1800L
+    private val probeTimeoutMs: Long = 2000L
 ) {
 
     enum class NetworkState {
@@ -50,14 +51,69 @@ class WhiteListDetector(
         val DEFAULT_EXTERNAL_PROBES = listOf(
             "https://www.google.com/generate_204",
             "https://1.1.1.1",
-            "https://gitlab.com/favicon.ico"
+            "https://github.com/favicon.ico",
+            "https://gitlab.com/favicon.ico",
+            "https://en.wikipedia.org/favicon.ico",
+            "https://stackoverflow.com/favicon.ico",
+            "https://python.org/favicon.ico",
+            "https://telegram.org/favicon.ico",
+            "https://2ip.io/favicon.ico"
         )
 
         val DEFAULT_WHITELIST_PROBES = listOf(
+            "https://gosuslugi.ru/favicon.ico",
             "https://vk.ru/favicon.ico",
             "https://yandex.ru/favicon.ico",
-            "https://gosuslugi.ru/favicon.ico"
+            "https://dzen.ru/favicon.ico",
+            "https://ok.ru/favicon.ico",
+            "https://mail.ru/favicon.ico",
+            "https://ozon.ru/favicon.ico",
+            "https://wildberries.ru/favicon.ico",
+            "https://avito.ru/favicon.ico",
+            "https://2gis.ru/favicon.ico",
+            "https://rutube.ru/favicon.ico",
+            "https://alfabank.ru/favicon.ico",
+            "https://vtb.ru/favicon.ico",
+            "https://tinkoff.ru/favicon.ico",
+            "https://sberbank.ru/favicon.ico",
+            "https://rzd.ru/favicon.ico",
+            "https://cdek.ru/favicon.ico",
+            "https://hh.ru/favicon.ico"
         )
+
+        fun resolveProbeTitle(url: String): String {
+            val host = url.removePrefix("https://").removePrefix("http://").substringBefore("/")
+            return when {
+                host.contains("gosuslugi") -> "Госуслуги"
+                host.contains("vk.ru") || host.contains("vk.com") -> "ВКонтакте"
+                host.contains("yandex") -> "Яндекс"
+                host.contains("dzen") -> "Дзен"
+                host.contains("ok.ru") -> "Одноклассники"
+                host.contains("mail.ru") -> "Mail.ru"
+                host.contains("ozon") -> "Ozon"
+                host.contains("wildberries") -> "Wildberries"
+                host.contains("avito") -> "Авито"
+                host.contains("2gis") -> "2ГИС"
+                host.contains("rutube") -> "Rutube"
+                host.contains("alfabank") -> "Альфа-Банк"
+                host.contains("vtb") -> "ВТБ"
+                host.contains("tinkoff") -> "Т-Банк"
+                host.contains("sberbank") -> "Сбербанк"
+                host.contains("rzd") -> "РЖД"
+                host.contains("cdek") -> "СДЭК"
+                host.contains("hh.ru") -> "HeadHunter"
+                host.contains("google") -> "Google"
+                host == "1.1.1.1" -> "Cloudflare 1.1.1.1"
+                host.contains("github") -> "GitHub"
+                host.contains("gitlab") -> "GitLab"
+                host.contains("wikipedia") -> "Wikipedia"
+                host.contains("stackoverflow") -> "Stack Overflow"
+                host.contains("python") -> "Python.org"
+                host.contains("telegram") -> "Telegram"
+                host.contains("2ip") -> "2IP"
+                else -> host
+            }
+        }
     }
 
     private val client: OkHttpClient by lazy {
@@ -198,7 +254,7 @@ class WhiteListDetector(
                 val latency = (System.nanoTime() - startNs) / 1_000_000L
                 if (continuation.isActive) {
                     continuation.resume(
-                        ProbeResult(url = url, isSuccess = false, httpCode = 0, latencyMs = latency, error = e.message),
+                        ProbeResult(url = url, title = resolveProbeTitle(url), isSuccess = false, httpCode = 0, latencyMs = latency, error = e.message),
                         onCancellation = null
                     )
                 }
@@ -211,7 +267,7 @@ class WhiteListDetector(
                 val isReachable = code in 100..499
                 if (continuation.isActive) {
                     continuation.resume(
-                        ProbeResult(url = url, isSuccess = isReachable, httpCode = code, latencyMs = latency),
+                        ProbeResult(url = url, title = resolveProbeTitle(url), isSuccess = isReachable, httpCode = code, latencyMs = latency),
                         onCancellation = null
                     )
                 }

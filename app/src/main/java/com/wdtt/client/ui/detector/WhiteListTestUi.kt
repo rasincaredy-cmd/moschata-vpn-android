@@ -139,15 +139,15 @@ fun WhiteListTestCard(
             // Поясняющий текст
             Text(
                 text = when {
-                    isChecking -> "Опрос Google 204, Cloudflare 1.1.1.1 и реестра социально значимых сайтов РФ..."
+                    isChecking -> "Тестирование 27 контрольных сервисов (РФ и мировых)..."
                     report?.state == WhiteListDetector.NetworkState.FULL_INTERNET ->
-                        "Внешний интернет открыт без ограничений оператора. Режим обхода БС не требуется — используйте скоростной WireGuard."
+                        "Внешний интернет открыт (${report!!.externalProbes.count { it.isSuccess }}/${report!!.externalProbes.size} мировых сервисов). Режим обхода БС не требуется — используйте скоростной WireGuard."
                     report?.state == WhiteListDetector.NetworkState.WHITELIST_ONLY ->
-                        "Оператор заблокировал внешний интернет! Доступны только ресурсы РФ. Включите режим «Обход БС» для свободного доступа."
+                        "Оператор заблокировал внешний интернет! Доступны только ресурсы РФ (${report!!.whitelistProbes.count { it.isSuccess }}/${report!!.whitelistProbes.size}). Рекомендуется включить «Обход БС»."
                     report?.state == WhiteListDetector.NetworkState.NO_INTERNET ->
                         "Нет доступа к внешним и российским серверам. Проверьте мобильную передачу данных."
                     else ->
-                        "Проверьте, действует ли сейчас ограничение «Белый Список» у вашего оператора."
+                        "Проверьте, действует ли сейчас ограничение «Белый Список» у вашего оператора (проверка 27 сервисов)."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -322,12 +322,12 @@ private fun ProbeItemView(probe: ProbeResult) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = probe.url.removePrefix("https://").substringBefore("/"),
+                    text = "${probe.title} (${probe.url.removePrefix("https://").removePrefix("http://").substringBefore("/")})",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = if (probe.isSuccess) "Код: ${probe.httpCode} • ${probe.latencyMs} мс" else (probe.error ?: "Блокировка / таймаут"),
+                    text = if (probe.isSuccess) "Ответ получен • ${probe.latencyMs} мс" else (probe.error ?: "Блокировка / таймаут"),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (probe.isSuccess) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
                 )
