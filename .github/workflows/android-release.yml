@@ -87,7 +87,23 @@ jobs:
           fi
 
       - name: Build release APKs
-        run: ./gradlew :app:assembleRelease -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 --no-daemon
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleRelease -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 --no-daemon 2>&1 | tee build_output.log
+
+      - name: Capture build log on failure
+        if: failure()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan ci-debug-log
+          git rm -rf . || true
+          tail -n 250 build_output.log > ci_error.log
+          git add ci_error.log
+          git commit -m "Capture build failure log"
+          git push -f origin ci-debug-log || true
 
       - name: Verify and name APKs
         shell: bash

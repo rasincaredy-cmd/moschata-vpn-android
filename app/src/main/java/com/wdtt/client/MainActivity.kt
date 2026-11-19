@@ -169,17 +169,11 @@ class MainActivity : ComponentActivity() {
             val isDynamicColor by settingsStore.isDynamicColor.collectAsStateWithLifecycle(initialValue = false)
             val themePalette by settingsStore.themePalette.collectAsStateWithLifecycle(initialValue = "indigo")
 
-            val darkTheme = when (themeMode) {
-                "light" -> false
-                "dark" -> true
-                else -> isSystemInDarkTheme()
-            }
-
             var pendingRelease by remember { mutableStateOf<AppReleaseInfo?>(null) }
 
             LaunchedEffect(Unit) {
                 try {
-                    val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includeBeta = false)
+                    val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
                     if (release != null) {
                         pendingRelease = release
                     }
@@ -187,9 +181,9 @@ class MainActivity : ComponentActivity() {
             }
 
             WDTTTheme(
-                darkTheme = darkTheme,
+                themeMode = themeMode,
                 dynamicColor = isDynamicColor,
-                palette = themePalette
+                themePalette = themePalette
             ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),

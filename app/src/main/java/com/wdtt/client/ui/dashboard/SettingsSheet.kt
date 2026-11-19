@@ -231,7 +231,7 @@ fun SettingsSheet(
                             if (isCheckingUpdates) return@OutlinedButton
                             scope.launch {
                                 isCheckingUpdates = true
-                                val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includeBeta = false)
+                                val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
                                 isCheckingUpdates = false
                                 if (release != null) {
                                     Toast.makeText(context, "Доступно обновление: ${release.versionTag}!", Toast.LENGTH_LONG).show()
