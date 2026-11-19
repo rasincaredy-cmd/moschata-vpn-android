@@ -1344,59 +1344,32 @@ fun ProfilesTab(
                             }
                             
                             Text(
-                                "Вы можете получить готовые профили напрямую в этих Telegram-ботах:",
+                                "Получить готовую подписку или профиль можно в нашем Telegram-боте:",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
 
-                            Column(
+                            Button(
+                                onClick = {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/MoschataVPN_bot"))
+                                    context.startActivity(intent)
+                                },
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
                             ) {
-                                Button(
-                                    onClick = {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/darkbit_vpnbot"))
-                                        context.startActivity(intent)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surface,
-                                        contentColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(vertical = 10.dp)
-                                ) {
-                                    Text(
-                                        "🤖 @darkbit_vpnbot",
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-
-                                Button(
-                                    onClick = {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/sidylinkbot"))
-                                        context.startActivity(intent)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surface,
-                                        contentColor = MaterialTheme.colorScheme.primary
-                                    ),
-                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    contentPadding = PaddingValues(vertical = 10.dp)
-                                ) {
-                                    Text(
-                                        "🤖 @sidylinkbot",
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
+                                Text(
+                                    "🤖 @MoschataVPN_bot",
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
                             }
                         }
                     }

@@ -1621,7 +1621,7 @@ fun SettingsTabContent(
                             ) {
                                 Button(
                                     onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/darkbitVPN"))
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/MoschataVPN_bot"))
                                         context.startActivity(intent)
                                     },
                                     shape = RoundedCornerShape(8.dp),
@@ -1631,12 +1631,12 @@ fun SettingsTabContent(
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("Telegram", style = MaterialTheme.typography.labelMedium)
+                                    Text("Бот в Telegram", style = MaterialTheme.typography.labelMedium)
                                 }
 
                                 OutlinedButton(
                                     onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SpaceNeuroX/proxy-turn-vk-android"))
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/rasincaredy-cmd/moschata-vpn-android"))
                                         context.startActivity(intent)
                                     },
                                     shape = RoundedCornerShape(8.dp),
@@ -1647,43 +1647,6 @@ fun SettingsTabContent(
                             }
                         }
 
-                        Text(
-                            text = "Форк оригинального проекта amurcanov/proxy-turn-vk-android от разработчика SpaceNeuroX.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedButton(
-                            onClick = {
-                                val intent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://pay.cloudtips.ru/p/64a6c43c")
-                                )
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Favorite,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Поблагодарить разработчика",
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
-                        Text(
-                            text = "Если приложение помогает — можно оставить чаевые через CloudTips.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
@@ -1702,66 +1665,39 @@ fun SettingsTabContent(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        "Готовые профили",
+                                        "Moschata VPN",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
-                                
+
                                 Text(
-                                    "Вы можете получить готовые конфиги напрямую в этих Telegram-ботах:",
+                                    "Единое приложение: скоростной VPN + надежный обход Белых Списков операторов (глушилок) и блокировок РКН.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
-                                Column(
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/MoschataVPN_bot"))
+                                        context.startActivity(intent)
+                                    },
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.surface,
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
                                 ) {
-                                    Button(
-                                        onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/darkbit_vpnbot"))
-                                            context.startActivity(intent)
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.surface,
-                                            contentColor = MaterialTheme.colorScheme.primary
-                                        ),
-                                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        contentPadding = PaddingValues(vertical = 10.dp)
-                                    ) {
-                                        Text(
-                                            "🤖 @darkbit_vpnbot",
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/sidylinkbot"))
-                                            context.startActivity(intent)
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.surface,
-                                            contentColor = MaterialTheme.colorScheme.primary
-                                        ),
-                                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        contentPadding = PaddingValues(vertical = 10.dp)
-                                    ) {
-                                        Text(
-                                            "🤖 @sidylinkbot",
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                            style = MaterialTheme.typography.labelMedium
-                                        )
-                                    }
+                                    Text(
+                                        "🤖 Управление подпиской: @MoschataVPN_bot",
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
                                 }
                             }
                         }

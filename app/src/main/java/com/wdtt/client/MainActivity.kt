@@ -340,13 +340,7 @@ fun MainScreen(
     var requestCreateProfile by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val supportShownFor = settingsStore.supportNoticeShownVersionCode.first()
-        val currentCode = BuildConfig.VERSION_CODE
-        if (currentCode >= SettingsStore.SUPPORT_NOTICE_VERSION_CODE &&
-            supportShownFor < SettingsStore.SUPPORT_NOTICE_VERSION_CODE
-        ) {
-            showSupportNotice = true
-        }
+        // Support notice dialog disabled for Moschata VPN
     }
 
     // Тихое автообновление подписок при открытии (не во время туннеля).
@@ -568,73 +562,17 @@ fun MainScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Готовые профили",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        "Добро пожаловать в Moschata VPN",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Вы можете получить готовые конфиги напрямую в этих Telegram-ботах:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/darkbit_vpnbot"))
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Text(
-                                "🤖 @darkbit_vpnbot",
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/sidylinkbot"))
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Text(
-                                "🤖 @sidylinkbot",
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Следите за обновлениями",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Все дальнейшие обновления и новости мы будем публиковать в нашем канале:",
+                        "Получить персональную ссылку подписки или профиль подключения можно в нашем официальном Telegram-боте:",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppLinks.TELEGRAM_CHANNEL))
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppLinks.TELEGRAM_BOT))
                             context.startActivity(intent)
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -643,12 +581,12 @@ fun MainScreen(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(vertical = 10.dp)
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Text("📢 @darkbitVPN", style = MaterialTheme.typography.labelLarge)
+                        Text("🤖 @MoschataVPN_bot", style = MaterialTheme.typography.labelLarge)
                     }
                     Text(
-                        "Просто скопируйте текст профиля или конфигурационный файл и импортируйте его на вкладке «Профили». Эта памятка также доступна в настройках.",
+                        "Скопируйте ссылку подписки и добавьте её на вкладке «Профили». Приложение автоматически настроит прямое подключение и режим обхода белого списка.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

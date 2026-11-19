@@ -86,17 +86,17 @@ fun SupportNoticeDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
 
                 Text(
-                    text = "Новости, обновления и помощь — в нашем Telegram-канале:",
+                    text = "Новости, обновления и помощь — в нашем официальном Telegram-боте:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 OutlinedButton(
-                    onClick = { openUrl(AppLinks.TELEGRAM_CHANNEL) },
+                    onClick = { openUrl(AppLinks.TELEGRAM_BOT) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
                 ) {
-                    Text("📢 @darkbitVPN")
+                    Text("🤖 @MoschataVPN_bot")
                 }
 
                 Button(
