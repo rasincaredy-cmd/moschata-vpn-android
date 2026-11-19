@@ -4,7 +4,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,7 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,7 +58,6 @@ fun ProfilesBottomSheet(
                 .padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Заголовок и быстрые действия
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -80,7 +77,6 @@ fun ProfilesBottomSheet(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Обновить подписку
                     IconButton(
                         onClick = {
                             if (isSyncing) return@IconButton
@@ -88,7 +84,7 @@ fun ProfilesBottomSheet(
                                 isSyncing = true
                                 var updatedCount = 0
                                 for (sub in subscriptions) {
-                                    val res = profilesStore.syncSubscription(sub)
+                                    val res = profilesStore.refreshSubscription(sub.id)
                                     if (res.isSuccess) updatedCount += res.getOrDefault(0)
                                 }
                                 isSyncing = false
@@ -99,18 +95,16 @@ fun ProfilesBottomSheet(
                         if (isSyncing) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Rounded.Refresh, contentDescription = "Обновить подписки")
+                            Icon(Icons.Filled.Refresh, contentDescription = "Обновить подписки")
                         }
                     }
 
-                    // Сканировать QR
                     IconButton(onClick = onScanQr) {
-                        Icon(Icons.Rounded.QrCodeScanner, contentDescription = "Сканировать QR")
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = "Сканировать QR")
                     }
 
-                    // Добавить подписку
                     IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Rounded.Add, contentDescription = "Добавить подписку", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Filled.Add, contentDescription = "Добавить подписку", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -141,7 +135,7 @@ fun ProfilesBottomSheet(
                             onClick = { showAddDialog = true },
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Rounded.AddLink, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Добавить подписку")
                         }
@@ -184,7 +178,6 @@ fun ProfilesBottomSheet(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Флаг
                                     Text(
                                         text = if (profile.name.contains("Нидерланд", ignoreCase = true) || profile.peer.contains("48.102") || profile.peer.contains("13.143")) "🇳🇱" else "🌐",
                                         style = MaterialTheme.typography.headlineSmall
@@ -224,7 +217,7 @@ fun ProfilesBottomSheet(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            Icons.Rounded.Check,
+                                            Icons.Filled.Check,
                                             contentDescription = "Выбран",
                                             tint = MaterialTheme.colorScheme.onPrimary,
                                             modifier = Modifier.size(16.dp)
@@ -265,7 +258,7 @@ fun ProfilesBottomSheet(
                         },
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(Icons.Rounded.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Вставить из буфера")
                     }

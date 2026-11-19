@@ -23,11 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.wdtt.client.ui.AppUpdateDialog
+import com.wdtt.client.ui.components.AppUpdateDialog
 import com.wdtt.client.ui.dashboard.DashboardScreen
 import com.wdtt.client.ui.theme.WDTTTheme
-import com.wdtt.client.update.AppReleaseInfo
-import com.wdtt.client.update.AppUpdate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -107,7 +105,7 @@ class MainActivity : ComponentActivity() {
         var activeActivities = 0
         var isForeground: Boolean
             get() = activeActivities > 0
-            set(_) {}
+            set(value) {}
 
         var currentActivity: MainActivity? = null
         val pendingFileUri = mutableStateOf<Uri?>(null)
@@ -180,10 +178,9 @@ class MainActivity : ComponentActivity() {
 
             var pendingRelease by remember { mutableStateOf<AppReleaseInfo?>(null) }
 
-            // Проверка обновлений в фоне
             LaunchedEffect(Unit) {
                 try {
-                    val release = AppUpdate.checkGithubRelease(includeBeta = false)
+                    val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includeBeta = false)
                     if (release != null) {
                         pendingRelease = release
                     }
@@ -209,11 +206,8 @@ class MainActivity : ComponentActivity() {
                 pendingRelease?.let { release ->
                     AppUpdateDialog(
                         release = release,
-                        onDismiss = { pendingRelease = null },
-                        onDownloadAndInstall = {
-                            AppUpdate.downloadAndInstallApk(this@MainActivity, release.apkUrl, release.tagName)
-                            pendingRelease = null
-                        }
+                        onPostpone = { pendingRelease = null },
+                        onUpdate = { pendingRelease = null }
                     )
                 }
             }

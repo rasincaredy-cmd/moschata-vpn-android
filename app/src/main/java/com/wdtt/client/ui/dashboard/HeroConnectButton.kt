@@ -9,11 +9,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.PowerSettingsNew
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +43,6 @@ fun HeroConnectButton(
     val view = LocalView.current
     val interactionSource = remember { MutableInteractionSource() }
 
-    // Анимация пульсации для Connecting и Connected состояний
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -65,7 +63,6 @@ fun HeroConnectButton(
         label = "pulseAlpha"
     )
 
-    // Цвета в зависимости от состояния
     val emerald = Color(0xFF00E676)
     val electricViolet = Color(0xFF9D4EDD)
     val amber = Color(0xFFFFA726)
@@ -96,7 +93,6 @@ fun HeroConnectButton(
         contentAlignment = Alignment.Center,
         modifier = modifier.size(220.dp)
     ) {
-        // Фоновая неоновая пульсация
         if (visualState != ConnectionVisualState.IDLE) {
             Canvas(
                 modifier = Modifier
@@ -115,7 +111,6 @@ fun HeroConnectButton(
             }
         }
 
-        // Внешнее кольцо
         Canvas(modifier = Modifier.size(176.dp)) {
             drawCircle(
                 color = when (visualState) {
@@ -126,7 +121,6 @@ fun HeroConnectButton(
             )
         }
 
-        // Сама кнопка подключения
         Surface(
             shape = CircleShape,
             color = when (visualState) {
@@ -162,9 +156,9 @@ fun HeroConnectButton(
             ) {
                 Icon(
                     imageVector = when (visualState) {
-                        ConnectionVisualState.CONNECTED_BYPASS -> Icons.Rounded.Bolt
-                        ConnectionVisualState.CONNECTED_WIREGUARD -> Icons.Rounded.Shield
-                        else -> Icons.Rounded.PowerSettingsNew
+                        ConnectionVisualState.CONNECTED_BYPASS -> Icons.Filled.FlashOn
+                        ConnectionVisualState.CONNECTED_WIREGUARD -> Icons.Filled.Shield
+                        else -> Icons.Filled.PowerSettingsNew
                     },
                     contentDescription = "Подключение",
                     tint = when (visualState) {

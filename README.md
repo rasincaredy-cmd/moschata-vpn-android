@@ -37,8 +37,8 @@
 
 | Версия | Архитектура | Ссылка на скачивание |
 | :--- | :--- | :--- |
-| **v1.5.0 (Актуальная)** | **arm64-v8a** *(Рекомендуется для большинства смартфонов)* | [⬇️ **Скачать APK (arm64-v8a)**](https://github.com/rasincaredy-cmd/moschata-vpn-android/releases/download/v1.5.0/moschata-vpn-1.5.0-arm64-v8a.apk) |
-| **v1.5.0 (Актуальная)** | **Universal** *(Для всех типов процессоров и эмуляторов)* | [⬇️ **Скачать APK (Universal)**](https://github.com/rasincaredy-cmd/moschata-vpn-android/releases/download/v1.5.0/moschata-vpn-1.5.0-universal.apk) |
+| **v1.5.1 (Актуальная)** | **arm64-v8a** *(Рекомендуется для большинства смартфонов)* | [⬇️ **Скачать APK (arm64-v8a)**](https://github.com/rasincaredy-cmd/moschata-vpn-android/releases/download/v1.5.1/moschata-vpn-1.5.1-arm64-v8a.apk) |
+| **v1.5.1 (Актуальная)** | **Universal** *(Для всех типов процессоров и эмуляторов)* | [⬇️ **Скачать APK (Universal)**](https://github.com/rasincaredy-cmd/moschata-vpn-android/releases/download/v1.5.1/moschata-vpn-1.5.1-universal.apk) |
 
 ---
 

@@ -85,10 +85,10 @@ fun WhiteListTestCard(
                     ) {
                         Icon(
                             imageVector = when (report?.state) {
-                                WhiteListDetector.NetworkState.FULL_INTERNET -> Icons.Rounded.CheckCircle
-                                WhiteListDetector.NetworkState.WHITELIST_ONLY -> Icons.Rounded.Warning
-                                WhiteListDetector.NetworkState.NO_INTERNET -> Icons.Rounded.WifiOff
-                                null -> Icons.Rounded.Shield
+                                WhiteListDetector.NetworkState.FULL_INTERNET -> Icons.Filled.CheckCircle
+                                WhiteListDetector.NetworkState.WHITELIST_ONLY -> Icons.Filled.Warning
+                                WhiteListDetector.NetworkState.NO_INTERNET -> Icons.Filled.WifiOff
+                                null -> Icons.Filled.Shield
                             },
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.surface,
@@ -127,7 +127,7 @@ fun WhiteListTestCard(
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Info,
+                            imageVector = Icons.Filled.Info,
                             contentDescription = "Подробности",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
@@ -173,7 +173,7 @@ fun WhiteListTestCard(
                         Spacer(Modifier.width(8.dp))
                         Text("Проверка…")
                     } else {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(if (report == null) "Проверить сеть" else "Повторить тест")
                     }

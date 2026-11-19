@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -91,7 +91,6 @@ fun DashboardScreen(
         else String.format("%02d:%02d", mins, secs)
     }
 
-    // Если открыт оверлей (Исключения или Логи)
     if (currentOverlayScreen == "exceptions") {
         Scaffold(
             topBar = {
@@ -99,7 +98,7 @@ fun DashboardScreen(
                     title = { Text("Исключения приложений") },
                     navigationIcon = {
                         IconButton(onClick = { currentOverlayScreen = null }) {
-                            Icon(Icons.Rounded.ArrowBack, contentDescription = "Назад")
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Назад")
                         }
                     }
                 )
@@ -119,7 +118,7 @@ fun DashboardScreen(
                     title = { Text("Журнал работы") },
                     navigationIcon = {
                         IconButton(onClick = { currentOverlayScreen = null }) {
-                            Icon(Icons.Rounded.ArrowBack, contentDescription = "Назад")
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Назад")
                         }
                     }
                 )
@@ -149,10 +148,9 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    // Шестерёнка настроек
                     IconButton(onClick = { showSettingsSheet = true }) {
                         Icon(
-                            Icons.Rounded.Settings,
+                            Icons.Filled.Settings,
                             contentDescription = "Настройки",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -185,7 +183,6 @@ fun DashboardScreen(
                     onClick = onToggleConnection
                 )
 
-                // Статус текст
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -264,7 +261,7 @@ fun DashboardScreen(
                     }
 
                     Icon(
-                        Icons.Rounded.KeyboardArrowDown,
+                        Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Сменить сервер",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

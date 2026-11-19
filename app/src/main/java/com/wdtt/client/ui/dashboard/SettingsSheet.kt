@@ -7,7 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.AppLinks
 import com.wdtt.client.BuildConfig
 import com.wdtt.client.SettingsStore
-import com.wdtt.client.update.AppUpdate
+import com.wdtt.client.fetchLatestReleaseInfo
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,8 +41,6 @@ fun SettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
-    val autoSwitchToLogs by settingsStore.autoSwitchToLogs.collectAsStateWithLifecycle(initialValue = false)
-
     var isCheckingUpdates by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -90,7 +86,7 @@ fun SettingsSheet(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Открыть @MoschataVPN_bot")
                     }
@@ -123,7 +119,7 @@ fun SettingsSheet(
                         )
                     }
                     Icon(
-                        Icons.Rounded.ChevronRight,
+                        Icons.Filled.ChevronRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -205,7 +201,7 @@ fun SettingsSheet(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Rounded.Terminal, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.Terminal, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Журнал (Логи)")
                         }
@@ -224,7 +220,7 @@ fun SettingsSheet(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Копия отчёта")
                         }
@@ -235,11 +231,10 @@ fun SettingsSheet(
                             if (isCheckingUpdates) return@OutlinedButton
                             scope.launch {
                                 isCheckingUpdates = true
-                                val release = AppUpdate.checkGithubRelease(includeBeta = false)
+                                val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includeBeta = false)
                                 isCheckingUpdates = false
                                 if (release != null) {
-                                    Toast.makeText(context, "Доступно обновление: ${release.tagName}!", Toast.LENGTH_LONG).show()
-                                    AppUpdate.downloadAndInstallApk(context, release.apkUrl, release.tagName)
+                                    Toast.makeText(context, "Доступно обновление: ${release.versionTag}!", Toast.LENGTH_LONG).show()
                                 } else {
                                     Toast.makeText(context, "У вас установлена последняя версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                                 }
@@ -253,7 +248,7 @@ fun SettingsSheet(
                             Spacer(Modifier.width(8.dp))
                             Text("Проверка…")
                         } else {
-                            Icon(Icons.Rounded.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Filled.Update, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Проверить обновление (v${BuildConfig.VERSION_NAME})")
                         }
