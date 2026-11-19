@@ -279,7 +279,7 @@ fun SettingsSheet(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     // 2. Мощность (число параллельных потоков)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -293,17 +293,20 @@ fun SettingsSheet(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Slider(
-                            value = workersPerHash.toFloat(),
-                            onValueChange = { newVal ->
-                                scope.launch { settingsStore.saveWorkersPerHash(newVal.toInt()) }
-                            },
-                            valueRange = 1f..27f,
-                            steps = 25,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(9, 18, 27).forEach { count ->
+                                FilterChip(
+                                    selected = workersPerHash == count,
+                                    onClick = { scope.launch { settingsStore.saveWorkersPerHash(count) } },
+                                    label = { Text("$count потоков") }
+                                )
+                            }
+                        }
                         Text(
-                            text = "Количество параллельных потоков VK TURN. 9 — стандартный баланс, увеличивайте при потерях пакетов.",
+                            text = "TURN-серверы VK выделяют сокеты пачками по 9 на сессию. 9 — 1 группа (стандарт), 18 — 2 группы (турбо), 27 — 3 группы (максимум).",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
