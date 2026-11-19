@@ -22,8 +22,8 @@ android {
         applicationId = "net.qwdtt.client"
         minSdk = 28
         targetSdk = 35
-        versionCode = 48
-        versionName = "1.5.1"
+        versionCode = 49
+        versionName = "1.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -143,26 +143,8 @@ tasks.register<Exec>("buildNativeLibs") {
     )
 }
 
-tasks.register<Exec>("buildServerAsset") {
-    group = "build"
-    description = "Build Linux server binary and copy it into app assets"
-    workingDir = rootDir
-    environment("GOOS", "linux")
-    environment("GOARCH", "amd64")
-    environment("CGO_ENABLED", "0")
-    commandLine(
-        "go",
-        "build",
-        "-trimpath",
-        "-o",
-        rootDir.resolve("app/src/main/assets/server").absolutePath,
-        "./server",
-    )
-}
-
 tasks.named("preBuild").configure {
     dependsOn("buildNativeLibs")
-    dependsOn("buildServerAsset")
 }
 
 dependencies {

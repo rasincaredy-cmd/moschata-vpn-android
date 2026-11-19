@@ -23,9 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.wdtt.client.ui.components.AppUpdateDialog
+import com.wdtt.client.ui.AppUpdateDialog
 import com.wdtt.client.ui.dashboard.DashboardScreen
-import com.wdtt.client.ui.theme.WDTTTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 

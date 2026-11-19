@@ -29,8 +29,8 @@ import com.wdtt.client.detector.WhiteListDetector
 import com.wdtt.client.detector.WhiteListDetectorManager
 import com.wdtt.client.ui.detector.WhiteListDetailsSheet
 import com.wdtt.client.ui.detector.WhiteListTestCard
-import com.wdtt.client.ui.exceptions.ExceptionsTab
-import com.wdtt.client.ui.logs.LogsTab
+import com.wdtt.client.ui.ExceptionsTab
+import com.wdtt.client.ui.LogsTab
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
