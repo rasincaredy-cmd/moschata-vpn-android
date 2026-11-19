@@ -50,7 +50,7 @@ class QuickToggleTileService : TileService() {
                         } else {
                             Toast.makeText(
                                 this@QuickToggleTileService,
-                                "Разрешите qWDTT создать VPN-подключение",
+                                "Разрешите Moschata VPN создать VPN-подключение",
                                 Toast.LENGTH_LONG,
                             ).show()
                             openVpnPermissionActivity()
@@ -76,7 +76,7 @@ class QuickToggleTileService : TileService() {
     private fun updateTileConnecting() {
         val tile = qsTile ?: return
         tile.state = Tile.STATE_UNAVAILABLE
-        tile.label = "qWDTT"
+        tile.label = "Moschata VPN"
         if (Build.VERSION.SDK_INT >= 29) {
             tile.subtitle = "Подключение…"
         }
@@ -87,13 +87,13 @@ class QuickToggleTileService : TileService() {
         val tile = qsTile ?: return
         if (running) {
             tile.state = Tile.STATE_ACTIVE
-            tile.label = "qWDTT: Вкл"
+            tile.label = "Moschata: Вкл"
             if (Build.VERSION.SDK_INT >= 29) {
                 tile.subtitle = "Активен"
             }
         } else {
             tile.state = Tile.STATE_INACTIVE
-            tile.label = "qWDTT: Выкл"
+            tile.label = "Moschata: Выкл"
             if (Build.VERSION.SDK_INT >= 29) {
                 tile.subtitle = "Отключен"
             }

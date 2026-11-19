@@ -162,7 +162,7 @@ object ConnectionDiagnostics {
     fun reportText(state: DiagnosticsState): String = buildString {
         val time = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
             .format(Date(if (state.finishedAtMs > 0) state.finishedAtMs else state.startedAtMs))
-        appendLine("qWDTT — проверка соединения ($time)")
+        appendLine("Moschata VPN — проверка соединения ($time)")
         state.verdict?.let {
             appendLine("Итог: ${it.title} [${it.code}]")
             appendLine(it.text)

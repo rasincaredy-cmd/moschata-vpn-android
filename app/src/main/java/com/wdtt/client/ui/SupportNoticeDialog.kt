@@ -63,7 +63,7 @@ fun SupportNoticeDialog(
                     )
                     androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
                     Text(
-                        text = "qWDTT $versionName",
+                        text = "Moschata VPN $versionName",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )

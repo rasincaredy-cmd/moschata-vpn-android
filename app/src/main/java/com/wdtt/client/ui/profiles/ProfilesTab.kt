@@ -995,7 +995,7 @@ fun ProfilesTab(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        "qWDTT автоматически считывает и импортирует настройки из ссылок, файлов и QR-кодов.",
+                        "Moschata VPN автоматически считывает и импортирует настройки из ссылок, файлов и QR-кодов.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

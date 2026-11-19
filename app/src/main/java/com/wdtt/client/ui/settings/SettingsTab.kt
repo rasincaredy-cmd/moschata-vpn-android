@@ -32,6 +32,9 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.rounded.NetworkCheck
+import androidx.compose.material.icons.rounded.Shield
+import com.wdtt.client.ui.detector.WhiteListTestCard
+import com.wdtt.client.ui.detector.WhiteListDetailsSheet
 import androidx.compose.runtime.snapshotFlow
 import com.wdtt.client.ConnectionDiagnostics
 import com.wdtt.client.DiagSeverity
@@ -240,6 +243,7 @@ fun SettingsTabContent(
     val diagState by TunnelManager.diagnostics.collectAsStateWithLifecycle()
     val diagActiveWorkers by TunnelManager.activeWorkers.collectAsStateWithLifecycle()
     var showDiagSheet by rememberSaveable { mutableStateOf(false) }
+    var showWhiteListSheet by rememberSaveable { mutableStateOf(false) }
     val openAppSettingsRequest by TunnelManager.openAppSettingsRequest.collectAsStateWithLifecycle()
     var lastHandledOpenSettings by rememberSaveable { mutableLongStateOf(0L) }
     LaunchedEffect(openAppSettingsRequest) {
@@ -619,10 +623,16 @@ fun SettingsTabContent(
             onAction = { runDiagnosticsAction(it) },
             onCopy = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Проверка соединения qWDTT", ConnectionDiagnostics.reportText(diagState)))
+                clipboard.setPrimaryClip(ClipData.newPlainText("Проверка соединения Moschata VPN", ConnectionDiagnostics.reportText(diagState)))
                 Toast.makeText(context, "Отчёт скопирован — паролей и ключей в нём нет", Toast.LENGTH_SHORT).show()
             },
             onDismiss = { showDiagSheet = false },
+        )
+    }
+
+    if (showWhiteListSheet) {
+        WhiteListDetailsSheet(
+            onDismiss = { showWhiteListSheet = false }
         )
     }
 
@@ -1150,7 +1160,7 @@ fun SettingsTabContent(
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                 )
                                 Text(
-                                    "Без них не видно статус туннеля, капчу и вход VK. На Xiaomi/Samsung включите уведомления для qWDTT вручную.",
+                                    "Без них не видно статус туннеля, капчу и вход VK. На Xiaomi/Samsung включите уведомления для Moschata VPN вручную.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                 )
@@ -1604,7 +1614,7 @@ fun SettingsTabContent(
                         ) {
                             Column {
                                 Text(
-                                    text = "qWDTT",
+                                    text = "Moschata VPN",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1786,14 +1796,14 @@ fun SettingsTabContent(
                         OutlinedButton(
                             onClick = {
                                 val reportText = """
-                                    Приложение: qWDTT
+                                    Приложение: Moschata VPN
                                     Версия: $currentVersion
                                     Android API: ${Build.VERSION.SDK_INT}
                                     Архитектура (ABI): ${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}
                                     Устройство: ${Build.MANUFACTURER} ${Build.MODEL}
                                 """.trimIndent()
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("qWDTT Report", reportText))
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Moschata VPN Report", reportText))
                                 Toast.makeText(context, "Отчёт о системе скопирован!", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -1834,12 +1844,20 @@ fun SettingsTabContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "qWDTT",
+                text = "Moschata VPN",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = MaterialTheme.colorScheme.primary
             )
             
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Тест Белого Списка (БС)
+                IconButton(onClick = { showWhiteListSheet = true }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Shield,
+                        contentDescription = "Тест Белого Списка",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
                 // Проверка соединения: цвет иконки — итог последней проверки.
                 val diagTint = when {
                     diagState.running || diagState.requested -> MaterialTheme.colorScheme.primary
@@ -2145,6 +2163,12 @@ fun SettingsTabContent(
                 onDismiss = { TunnelManager.dismissDiagnostics() },
             )
         }
+
+        // ═══ Тест Белого Списка (БС) ═══
+        WhiteListTestCard(
+            onOpenDetails = { showWhiteListSheet = true },
+            onSwitchToBypassMode = { onOpenProfiles() }
+        )
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 

@@ -124,7 +124,7 @@
 
         <receiver
             android:name=".TunnelWidgetProvider"
-            android:label="qWDTT Туннель"
+            android:label="Moschata VPN Туннель"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -137,7 +137,7 @@
 
         <service
             android:name=".QuickToggleTileService"
-            android:label="qWDTT"
+            android:label="Moschata VPN"
             android:icon="@drawable/ic_tile_custom"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">

@@ -1,6 +1,8 @@
 package com.wdtt.client.detector
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.*
 import java.io.IOException
 import java.security.SecureRandom
@@ -9,12 +11,28 @@ import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.X509TrustManager
 
+data class ProbeResult(
+    val url: String,
+    val isSuccess: Boolean,
+    val httpCode: Int = 0,
+    val latencyMs: Long = 0L,
+    val error: String? = null
+)
+
+data class DetectionReport(
+    val state: WhiteListDetector.NetworkState,
+    val externalProbes: List<ProbeResult>,
+    val whitelistProbes: List<ProbeResult>,
+    val durationMs: Long,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 /**
  * Автономный детектор Белых Списков (БС) оператора для Moschata VPN.
  * Проверяет доступность независимых внешних сервисов против социально значимых ресурсов РФ.
  */
 class WhiteListDetector(
-    private val probeTimeoutMs: Long = 1500L
+    private val probeTimeoutMs: Long = 1800L
 ) {
 
     enum class NetworkState {
@@ -29,21 +47,12 @@ class WhiteListDetector(
     }
 
     companion object {
-        /**
-         * Внешние независимые хосты:
-         * 1. Google 204 — стандартный captive-portal Android (быстрый, без тела ответа).
-         * 2. Прямой IP 1.1.1.1 — исключает влияние блокировки или подмены DNS оператором.
-         * 3. GitLab — независимый зарубежный репозиторий.
-         */
         val DEFAULT_EXTERNAL_PROBES = listOf(
             "https://www.google.com/generate_204",
             "https://1.1.1.1",
             "https://gitlab.com/favicon.ico"
         )
 
-        /**
-         * Хосты, гарантированно включенные в Белый Список социально значимых ресурсов РФ:
-         */
         val DEFAULT_WHITELIST_PROBES = listOf(
             "https://vk.ru/favicon.ico",
             "https://yandex.ru/favicon.ico",
@@ -51,7 +60,6 @@ class WhiteListDetector(
         )
     }
 
-    // Изолированный OkHttpClient с поддержкой сертификатов Минцифры и ранним выходом
     private val client: OkHttpClient by lazy {
         val trustAllManager = object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
@@ -88,10 +96,9 @@ class WhiteListDetector(
         var pendingExternal = externalUrls.size
         var pendingWhitelist = whitelistUrls.size
 
-        // 1. Параллельный запуск внешних зондов
         externalUrls.forEach { url ->
             launch(Dispatchers.IO) {
-                val ok = executeProbe(url)
+                val ok = executeProbe(url).isSuccess
                 if (ok) {
                     externalSuccessDeferred.complete(true)
                 } else {
@@ -105,10 +112,9 @@ class WhiteListDetector(
             }
         }
 
-        // 2. Параллельный запуск контрольных зондов Белого Списка РФ
         whitelistUrls.forEach { url ->
             launch(Dispatchers.IO) {
-                val ok = executeProbe(url)
+                val ok = executeProbe(url).isSuccess
                 if (ok) {
                     whitelistSuccessDeferred.complete(true)
                 } else {
@@ -122,14 +128,12 @@ class WhiteListDetector(
             }
         }
 
-        // Ранний выход: если хотя бы один внешний сайт ответил -> моментально FULL_INTERNET
         val hasExternal = externalSuccessDeferred.await()
         if (hasExternal) {
             coroutineContext.cancelChildren()
             return@coroutineScope NetworkState.FULL_INTERNET
         }
 
-        // Если внешний интернет не ответил, проверяем Белый Список РФ
         val hasWhitelist = whitelistSuccessDeferred.await()
         coroutineContext.cancelChildren()
 
@@ -141,9 +145,44 @@ class WhiteListDetector(
     }
 
     /**
-     * Неблокирующий HTTP-запрос без скачивания тела.
+     * Детальный замер всех зондов с возвратом отчета.
      */
-    private suspend fun executeProbe(url: String): Boolean = suspendCancellableCoroutine { continuation ->
+    suspend fun detectDetailed(
+        externalUrls: List<String> = DEFAULT_EXTERNAL_PROBES,
+        whitelistUrls: List<String> = DEFAULT_WHITELIST_PROBES
+    ): DetectionReport = coroutineScope {
+        val startTime = System.currentTimeMillis()
+
+        val externalDeferred = externalUrls.map { url ->
+            async(Dispatchers.IO) { executeProbe(url) }
+        }
+        val whitelistDeferred = whitelistUrls.map { url ->
+            async(Dispatchers.IO) { executeProbe(url) }
+        }
+
+        val externalResults = externalDeferred.awaitAll()
+        val whitelistResults = whitelistDeferred.awaitAll()
+
+        val hasExternal = externalResults.any { it.isSuccess }
+        val hasWhitelist = whitelistResults.any { it.isSuccess }
+
+        val state = when {
+            hasExternal -> NetworkState.FULL_INTERNET
+            hasWhitelist -> NetworkState.WHITELIST_ONLY
+            else -> NetworkState.NO_INTERNET
+        }
+
+        val duration = System.currentTimeMillis() - startTime
+        DetectionReport(
+            state = state,
+            externalProbes = externalResults,
+            whitelistProbes = whitelistResults,
+            durationMs = duration
+        )
+    }
+
+    private suspend fun executeProbe(url: String): ProbeResult = suspendCancellableCoroutine { continuation ->
+        val startNs = System.nanoTime()
         val request = Request.Builder()
             .url(url)
             .get()
@@ -156,18 +195,25 @@ class WhiteListDetector(
 
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
+                val latency = (System.nanoTime() - startNs) / 1_000_000L
                 if (continuation.isActive) {
-                    continuation.resume(false) {}
+                    continuation.resume(
+                        ProbeResult(url = url, isSuccess = false, httpCode = 0, latencyMs = latency, error = e.message),
+                        onCancellation = null
+                    )
                 }
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    // Коды 100..499 свидетельствуют о том, что веб-сервер ответил
-                    val isReachable = it.code in 100..499
-                    if (continuation.isActive) {
-                        continuation.resume(isReachable) {}
-                    }
+                val latency = (System.nanoTime() - startNs) / 1_000_000L
+                val code = response.code
+                response.close()
+                val isReachable = code in 100..499
+                if (continuation.isActive) {
+                    continuation.resume(
+                        ProbeResult(url = url, isSuccess = isReachable, httpCode = code, latencyMs = latency),
+                        onCancellation = null
+                    )
                 }
             }
         })
@@ -176,5 +222,39 @@ class WhiteListDetector(
     fun shutdown() {
         client.dispatcher.cancelAll()
         client.connectionPool.evictAll()
+    }
+}
+
+/**
+ * Глобальный синглтон-менеджер тестирования Белого Списка для Compose UI.
+ */
+object WhiteListDetectorManager {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val detector = WhiteListDetector(probeTimeoutMs = 1800L)
+
+    private val _report = MutableStateFlow<DetectionReport?>(null)
+    val report = _report.asStateFlow()
+
+    private val _isChecking = MutableStateFlow(false)
+    val isChecking = _isChecking.asStateFlow()
+
+    fun runCheck() {
+        if (_isChecking.value) return
+        scope.launch {
+            _isChecking.value = true
+            try {
+                val rep = detector.detectDetailed()
+                _report.value = rep
+            } catch (e: Exception) {
+                _report.value = DetectionReport(
+                    state = WhiteListDetector.NetworkState.NO_INTERNET,
+                    externalProbes = emptyList(),
+                    whitelistProbes = emptyList(),
+                    durationMs = 0L
+                )
+            } finally {
+                _isChecking.value = false
+            }
+        }
     }
 }
