@@ -69,33 +69,25 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          mkdir -p keystore
           keystore_path="keystore/moschata-release.jks"
-
           if [ -n "$KEYSTORE_BASE64" ]; then
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            printf '%s\n' \
+              "KEYSTORE_FILE=$(pwd)/$keystore_path" \
+              "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" \
+              "KEY_ALIAS=$KEY_ALIAS" \
+              "KEY_PASSWORD=$KEY_PASSWORD" > local.properties
           elif [ -f "$keystore_path" ]; then
-            echo "Using existing permanent release keystore from repository."
+            echo "Using committed permanent release keystore from repository."
+            printf '%s\n' \
+              "KEYSTORE_FILE=$(pwd)/$keystore_path" \
+              "KEYSTORE_PASSWORD=moschata123" \
+              "KEY_ALIAS=moschata" \
+              "KEY_PASSWORD=moschata123" > local.properties
           else
-            echo "Generating permanent release keystore..."
-            keytool -genkeypair -v -keystore "$keystore_path" \
-              -alias moschata -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass "moschata123" -keypass "moschata123" \
-              -dname "CN=MoschataVPN, OU=Moschata, O=Moschata, L=Perm, ST=Perm, C=RU"
-            
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add "$keystore_path"
-            git commit -m "Persist permanent release keystore [skip ci]" || true
-            git push origin HEAD:master || true
-            git push origin HEAD:main || true
+            echo "Error: Keystore not found at $keystore_path" >&2
+            exit 1
           fi
-
-          printf '%s\n' \
-            "KEYSTORE_FILE=$(pwd)/$keystore_path" \
-            "KEYSTORE_PASSWORD=moschata123" \
-            "KEY_ALIAS=moschata" \
-            "KEY_PASSWORD=moschata123" > local.properties
 
       - name: Build release APKs
         shell: bash
@@ -107,14 +99,16 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan ci-debug-log
-          git rm -rf . || true
-          tail -n 250 build_output.log > ci_error.log
-          git add ci_error.log
-          git commit -m "Capture build failure log"
-          git push -f origin ci-debug-log || true
+          if [ -f build_output.log ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan ci-debug-log
+            git rm -rf . || true
+            tail -n 250 build_output.log > ci_error.log
+            git add ci_error.log
+            git commit -m "Capture build failure log" || true
+            git push -f origin ci-debug-log || true
+          fi
 
       - name: Verify and name APKs
         shell: bash

@@ -28,6 +28,7 @@ app/src/main/assets/server
 # ===== Keystore / Secrets =====
 *.keystore
 *.jks
+!keystore/moschata-release.jks
 *.key
 *.pem
 
