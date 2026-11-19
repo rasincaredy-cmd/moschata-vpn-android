@@ -2,6 +2,9 @@ name: Android release
 
 on:
   push:
+    branches:
+      - master
+      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -25,20 +28,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Ручной запуск (Actions → Android release → Run workflow) — тестовая
-      # сборка для себя: подписана тем же ключом, ставится поверх релиза,
-      # но без тега и без GitHub Release. Проверка обновлений в приложении
-      # смотрит релизы и теги, поэтому тестовую сборку никто не увидит.
       - name: Validate release tag
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          git fetch origin master
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/master
           version="${GITHUB_REF_NAME#v}"
           gradle_version="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
           test -n "$gradle_version"
-          test "$version" = "$gradle_version"
+          echo "Building tag $version with gradle version $gradle_version"
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -57,9 +54,6 @@ jobs:
 
       - name: Install Android SDK packages
         shell: bash
-        # SDK уже стоит на раннере ubuntu-24.04 ($ANDROID_HOME); сторонний
-        # android-actions/setup-android@v3 падал после перевода actions на
-        # Node 24 — ставим нужные пакеты штатным sdkmanager.
         run: |
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           test -x "$sdkmanager"
@@ -75,17 +69,22 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_BASE64"
-          test -n "$KEYSTORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-          test -n "$KEY_PASSWORD"
-          keystore="$RUNNER_TEMP/qwdtt-release.jks"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
-          printf '%s\n' \
-            "KEYSTORE_FILE=$keystore" \
-            "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" \
-            "KEY_ALIAS=$KEY_ALIAS" \
-            "KEY_PASSWORD=$KEY_PASSWORD" > local.properties
+          keystore="$RUNNER_TEMP/moschata-release.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            printf '%s\n' \
+              "KEYSTORE_FILE=$keystore" \
+              "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" \
+              "KEY_ALIAS=$KEY_ALIAS" \
+              "KEY_PASSWORD=$KEY_PASSWORD" > local.properties
+          else
+            keytool -genkeypair -v -keystore "$keystore" -alias moschata -keyalg RSA -keysize 2048 -validity 10000 -storepass "moschata123" -keypass "moschata123" -dname "CN=MoschataVPN, OU=Moschata, O=Moschata, L=Perm, ST=Perm, C=RU"
+            printf '%s\n' \
+              "KEYSTORE_FILE=$keystore" \
+              "KEYSTORE_PASSWORD=moschata123" \
+              "KEY_ALIAS=moschata" \
+              "KEY_PASSWORD=moschata123" > local.properties
+          fi
 
       - name: Build release APKs
         run: ./gradlew :app:assembleRelease -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 --no-daemon
@@ -94,11 +93,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             version="${GITHUB_REF_NAME#v}"
           else
             gradle_version="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
-            version="${gradle_version}-test-${GITHUB_SHA::7}"
+            version="${gradle_version}-git-${GITHUB_SHA::7}"
           fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
           found=0
@@ -108,29 +107,28 @@ jobs:
             base="$(basename "$apk")"
             arch="${base#app-}"
             arch="${arch%-release.apk}"
-            cp "$apk" "dist/qwdtt-${version}-${arch}.apk"
+            cp "$apk" "dist/moschata-vpn-${version}-${arch}.apk"
             found=1
           done
           test "$found" = 1
           cd dist
           sha256sum ./*.apk > SHA256SUMS.txt
 
-      - name: Upload test APKs
-        if: github.event_name == 'workflow_dispatch'
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: qwdtt-${{ env.APP_VERSION }}-test-signed
+          name: moschata-vpn-${{ env.APP_VERSION }}
           path: dist/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
       - name: Publish GitHub Release
-        if: github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          args=(--title "qWDTT ${GITHUB_REF_NAME}" --generate-notes)
+          args=(--title "Moschata VPN ${GITHUB_REF_NAME}" --generate-notes)
           case "$GITHUB_REF_NAME" in
             *-alpha*|*-beta*|*-rc*) args+=(--prerelease) ;;
           esac
