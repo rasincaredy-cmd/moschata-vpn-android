@@ -174,7 +174,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 try {
                     val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
-                    if (release != null) {
+                    if (release != null && isNewerVersion("v${BuildConfig.VERSION_NAME}", release.versionTag, includePrerelease = false)) {
                         pendingRelease = release
                     }
                 } catch (_: Exception) {}

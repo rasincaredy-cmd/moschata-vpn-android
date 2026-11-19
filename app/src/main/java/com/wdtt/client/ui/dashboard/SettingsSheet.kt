@@ -26,6 +26,7 @@ import com.wdtt.client.AppLinks
 import com.wdtt.client.BuildConfig
 import com.wdtt.client.SettingsStore
 import com.wdtt.client.fetchLatestReleaseInfo
+import com.wdtt.client.isNewerVersion
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,7 +234,7 @@ fun SettingsSheet(
                                 isCheckingUpdates = true
                                 val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
                                 isCheckingUpdates = false
-                                if (release != null) {
+                                if (release != null && isNewerVersion("v${BuildConfig.VERSION_NAME}", release.versionTag, includePrerelease = false)) {
                                     Toast.makeText(context, "Доступно обновление: ${release.versionTag}!", Toast.LENGTH_LONG).show()
                                 } else {
                                     Toast.makeText(context, "У вас установлена последняя версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
