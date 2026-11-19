@@ -28,21 +28,20 @@ It combines high-speed direct tunneling with a specialized bypass mode and insta
 ## 2. Repository Layout
 
 - `app/src/main/java/com/wdtt/client/`
-  - `MainActivity.kt` — main entry point, navigation bar, lifecycle management, deep links, and update dialogs.
-  - `detector/` — `WhiteListDetector.kt` network probing engine and UI components.
-  - `tunnel/` — VPN service implementations (`TunnelService.kt`, `RawTunVpnService.kt`, `WireGuardHelper.kt`, `TunnelManager.kt`).
-  - `profiles/` — connection profiles and subscription models (`ProfilesStore.kt`, `SubscriptionImport.kt`).
-  - `settings/` — encrypted DataStore settings (`SettingsStore.kt`, `BypassShare.kt`).
-  - `ui/`
-    - `settings/SettingsTab.kt` — primary dashboard screen (connect button, active profile, White-List test card, configuration).
-    - `profiles/ProfilesTab.kt` — profile list, subscription management, QR code scanner, manual profile editor.
-    - `servers/ServersTab.kt` — self-hosted VPS server manager (admin interface).
-    - `exceptions/ExceptionsTab.kt` — per-app split tunneling (VPN bypass/include rules).
-    - `logs/LogsTab.kt` — live connection log viewer and system diagnostic exports.
-    - `theme/` — Material 3 theming, dynamic colors, and color palettes.
-- `go_client/` — Go backend code compiled via Gomobile (`netstack`, RTP obfuscation, WebRTC TURN client).
-- `server/` — reference server implementation (`wdtt-server`, admin API, database bot).
-- `.github/workflows/android-release.yml` — automated CI/CD for building signed release APKs on tag push (`v*`).
+  - `MainActivity.kt` — чистая точка входа без громоздких 5 табов, управление разрешениями VPN и оверлеями.
+  - `ui/dashboard/` — современный One-Thumb интерфейс:
+    - `DashboardScreen.kt` — главный экран (логотип, статус защиты, селектор сервера, детектор сети).
+    - `HeroConnectButton.kt` — тактильная 160dp кнопка с неоновыми радиальными состояниями и анимацией пульса.
+    - `ProfilesBottomSheet.kt` — шторка выбора локаций, добавления подписки и QR-сканера.
+    - `SettingsSheet.kt` — шторка настроек (ссылка на бота, раздельное туннелирование, автостарт, проверка обновлений).
+  - `detector/` — автономный `WhiteListDetector.kt` и UI-карточки проверки Белого Списка.
+  - `tunnel/` — VPN-движки (`TunnelService.kt`, `RawTunVpnService.kt`, `WireGuardHelper.kt`, `TunnelManager.kt`, `TunnelControl.kt`).
+  - `profiles/` — хранилище профилей и парсер подписок (`ProfilesStore.kt`, `SubscriptionImport.kt`).
+  - `settings/` — DataStore настройки (`SettingsStore.kt`, `BypassShare.kt`).
+  - `ui/exceptions/` — экран раздельного туннелирования (`ExceptionsTab.kt`).
+  - `ui/logs/` — консольный логгер и экспорт отчетов (`LogsTab.kt`).
+- `go_client/` — Gomobile бинарный модуль (netstack, RTP-обфускация, VK TURN клиент).
+- `.github/workflows/android-release.yml` — автоматическая сборка и публикация релизов при пуше тега (`v*`).
 
 ---
 

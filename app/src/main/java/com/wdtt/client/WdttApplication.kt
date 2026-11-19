@@ -14,7 +14,6 @@ class WdttApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         NotificationHelper.ensureTunnelChannel(this)
-        DeployManager.init(this)
         AppShortcuts.refreshAsync(this)
     }
 

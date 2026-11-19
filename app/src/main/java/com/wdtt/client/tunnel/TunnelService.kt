@@ -169,23 +169,6 @@ class TunnelService : Service() {
             }
             "STOP" -> stopTunnel()
             "SWITCH_MODE" -> switchMode(intent.getStringExtra("connection_mode"))
-            "DEPLOY_START" -> {
-                val notification = createNotification("Установка на сервер...", "DEPLOY_CANCEL", "Отменить")
-                startPersistentForeground(notification)
-                acquireWakeLock()
-            }
-            "DEPLOY_CANCEL" -> {
-                DeployManager.writeError("[!] ❌ Установка отменена пользователем")
-                DeployManager.stopDeploy("error: Отменена пользователем")
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            }
-            "DEPLOY_STOP" -> {
-                if (!TunnelManager.running.value) {
-                    stopTunnel()
-                } else {
-                    updateNotification("Туннель активен")
-                }
-            }
         }
         return START_STICKY
     }
