@@ -131,6 +131,7 @@ class SettingsStore(context: Context) {
         const val SUPPORT_NOTICE_VERSION_CODE = 28
 
         // ═══ Поведение ═══
+        private val AUTO_START_ON_BOOT = booleanPreferencesKey("auto_start_on_boot")
         private val AUTO_SWITCH_TO_LOGS = booleanPreferencesKey("auto_switch_to_logs")
         private val STOP_ON_WIFI = booleanPreferencesKey("stop_on_wifi")
         /** Автоперерезолв доменов обхода и reload WG при смене IP. */
@@ -451,6 +452,7 @@ class SettingsStore(context: Context) {
     val supportNoticeShownVersionCode: Flow<Int> = dataStore.data.map { it[SUPPORT_NOTICE_SHOWN_VERSION_CODE] ?: 0 }
 
     // ═══ Поведение ═══
+    val autoStartOnBoot: Flow<Boolean> = dataStore.data.map { it[AUTO_START_ON_BOOT] ?: false }
     val autoSwitchToLogs: Flow<Boolean> = dataStore.data.map { it[AUTO_SWITCH_TO_LOGS] ?: true }
     val stopOnWifi: Flow<Boolean> = dataStore.data.map { it[STOP_ON_WIFI] ?: false }
     /** Периодический перерезолв доменов обхода. По умолчанию включён. */
@@ -556,6 +558,12 @@ class SettingsStore(context: Context) {
     suspend fun saveUpdateCheckIntervalHours(hours: Int) {
         dataStore.edit { prefs ->
             prefs[UPDATE_CHECK_INTERVAL_HOURS] = hours
+        }
+    }
+
+    suspend fun saveAutoStartOnBoot(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[AUTO_START_ON_BOOT] = enabled
         }
     }
 
