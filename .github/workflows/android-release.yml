@@ -93,7 +93,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :app:testReleaseUnitTest --no-daemon 2>&1 | tee test_output.log
+          ./gradlew test --no-daemon 2>&1 | tee test_output.log
 
       - name: Build release APKs
         shell: bash
