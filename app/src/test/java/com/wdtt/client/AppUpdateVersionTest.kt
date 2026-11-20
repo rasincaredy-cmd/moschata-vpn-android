@@ -28,8 +28,10 @@ class AppUpdateVersionTest {
 
     @Test
     fun testIsNewerVersion_gitHashOrPrerelease() {
-        // Current version with git hash suffix compared against release
-        assertFalse(isNewerVersion("v1.6.0-git-d4c6ad9", "v1.6.0"))
+        // Stable release is newer than a dev/git build with the same version core
+        assertTrue(isNewerVersion("v1.6.0-git-d4c6ad9", "v1.6.0"))
+        // But dev build of a strictly higher version is newer than an older stable
+        assertTrue(isNewerVersion("v1.5.9", "v1.6.0-git-d4c6ad9"))
         // Prerelease handling on same core version
         assertFalse(isNewerVersion("v1.6.0", "v1.6.0-alpha", includePrerelease = false))
         assertTrue(isNewerVersion("v1.6.0", "v1.6.0-alpha", includePrerelease = true))
