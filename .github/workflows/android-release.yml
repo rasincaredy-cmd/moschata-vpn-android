@@ -92,7 +92,8 @@ jobs:
       - name: Run unit tests
         shell: bash
         run: |
-          ./gradlew :app:testReleaseUnitTest --no-daemon
+          set -o pipefail
+          ./gradlew :app:testReleaseUnitTest --no-daemon 2>&1 | tee test_output.log
 
       - name: Build release APKs
         shell: bash
@@ -104,16 +105,14 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          if [ -f build_output.log ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git checkout --orphan ci-debug-log
-            git rm -rf . || true
-            tail -n 250 build_output.log > ci_error.log
-            git add ci_error.log
-            git commit -m "Capture build failure log" || true
-            git push -f origin ci-debug-log || true
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan ci-debug-log
+          git rm -rf . || true
+          cat test_output.log build_output.log 2>/dev/null | tail -n 250 > ci_error.log
+          git add ci_error.log
+          git commit -m "Capture build failure log" || true
+          git push -f origin ci-debug-log || true
 
       - name: Verify and name APKs
         shell: bash
