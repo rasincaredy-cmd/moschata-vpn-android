@@ -1,0 +1,98 @@
+=== TEST OUTPUT ===
+
+Welcome to Gradle 9.1.0!
+
+Here are the highlights of this release:
+ - Full Java 25 support
+ - Native task graph visualization
+ - Enhanced console output
+
+For more details see https://docs.gradle.org/9.1.0/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/build.gradle.kts:135:21: 'fun setSrcDirs(srcDirs: Iterable<*>): Any' is deprecated. Use `directories` mutable set instead.
+✅ Signing config applied: /home/runner/work/moschata-vpn-android/moschata-vpn-android/keystore/moschata-release.jks
+
+> Task :app:buildNativeLibs
+Refreshing Go checksums
+Building arm64-v8a -> /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/arm64-v8a/libclient.so
+Done: /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/arm64-v8a/libclient.so
+Refreshing Go checksums
+Building armeabi-v7a -> /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/armeabi-v7a/libclient.so
+Done: /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/armeabi-v7a/libclient.so
+Refreshing Go checksums
+Building x86_64 -> /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/x86_64/libclient.so
+Done: /home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/jniLibs/x86_64/libclient.so
+
+> Task :app:preBuild
+> Task :app:preDebugBuild
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:javaPreCompileDebug
+> Task :app:parseDebugLocalResources
+> Task :app:checkDebugAarMetadata
+> Task :app:generateDebugRFile
+> Task :app:compileDebugNavigationResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+
+> Task :app:processDebugMainManifest
+/home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/AndroidManifest.xml:23:9-41 Warning:
+	android:extractNativeLibs should not be specified in this source AndroidManifest.xml file. See https://d.android.com/guide/topics/manifest/application-element#extractNativeLibs for more information.
+The AGP Upgrade Assistant can remove the attribute from the AndroidManifest.xml file and update the build file accordingly. See https://d.android.com/studio/build/agp-upgrade-assistant for more information.
+
+> Task :app:mergeDebugResources
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/Theme.kt:248:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/Theme.kt:249:20 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/Theme.kt:252:24 'var isStatusBarContrastEnforced: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/detector/WhiteListDetector.kt:256:34 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/detector/WhiteListDetector.kt:269:34 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/ui/dashboard/DashboardScreen.kt:103:47 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/ui/dashboard/DashboardScreen.kt:123:47 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/ui/dashboard/SettingsSheet.kt:111:43 'val Icons.Filled.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Send.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/ui/logs/LogsTab.kt:271:60 'val Icons.Filled.Notes: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Notes.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/vk/CaptchaWebViewManager.kt:228:25 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/vk/ManlCaptchaWebViewManager.kt:299:37 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/src/main/java/com/wdtt/client/vk/VkAuthWebViewManager.kt:895:13 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:processDebugJavaRes
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+
+> Task :app:testDebugUnitTest
+
+AppUpdateVersionTest > testIsNewerVersion_gitHashOrPrerelease FAILED
+    java.lang.AssertionError at AppUpdateVersionTest.kt:32
+
+11 tests completed, 1 failed
+
+> Task :app:testDebugUnitTest FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:testDebugUnitTest'.
+> There were failing tests. See the report at: file:///home/runner/work/moschata-vpn-android/moschata-vpn-android/app/build/reports/tests/testDebugUnitTest/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+BUILD FAILED in 1m 49s
+27 actionable tasks: 27 executed
+=== BUILD OUTPUT ===
