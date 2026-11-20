@@ -105,13 +105,16 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          mkdir -p /tmp/ci_logs
-          cp test_output.log build_output.log /tmp/ci_logs/ 2>/dev/null || true
+          cp test_output.log /tmp/test_output.log 2>/dev/null || true
+          cp build_output.log /tmp/build_output.log 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan ci-debug-log
+          git checkout -B ci-debug-log
           git rm -rf . || true
-          cat /tmp/ci_logs/test_output.log /tmp/ci_logs/build_output.log 2>/dev/null | tail -n 250 > ci_error.log
+          echo "=== TEST OUTPUT ===" > ci_error.log
+          cat /tmp/test_output.log >> ci_error.log 2>/dev/null || true
+          echo "=== BUILD OUTPUT ===" >> ci_error.log
+          cat /tmp/build_output.log >> ci_error.log 2>/dev/null || true
           git add ci_error.log
           git commit -m "Capture build failure log" || true
           git push -f origin ci-debug-log || true
