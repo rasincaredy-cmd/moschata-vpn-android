@@ -10,6 +10,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,14 @@ fun SettingsSheet(
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
     val connectionMode by settingsStore.connectionMode.collectAsStateWithLifecycle(initialValue = SettingsStore.CONNECTION_MODE_VPN)
     val workersPerHash by settingsStore.workersPerHash.collectAsStateWithLifecycle(initialValue = 9)
+    val vkHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
+    val hashCount = remember(vkHashes) {
+        val count = vkHashes.split(Regex("[,\\s\\n]+")).filter { it.isNotBlank() }.size
+        count.coerceIn(1, SettingsStore.MAX_VK_HASHES)
+    }
+    val workerOptions = remember(hashCount) {
+        (1..(hashCount * 3)).map { it * 9 }
+    }
     val turnTransport by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = "udp")
     val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
     val peer by settingsStore.peer.collectAsStateWithLifecycle(initialValue = "")
@@ -294,10 +303,12 @@ fun SettingsSheet(
                             )
                         }
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf(9, 18, 27).forEach { count ->
+                            workerOptions.forEach { count ->
                                 FilterChip(
                                     selected = workersPerHash == count,
                                     onClick = { scope.launch { settingsStore.saveWorkersPerHash(count) } },
@@ -306,7 +317,11 @@ fun SettingsSheet(
                             }
                         }
                         Text(
-                            text = "TURN-серверы VK выделяют сокеты пачками по 9 на сессию. 9 — 1 группа (стандарт), 18 — 2 группы (турбо), 27 — 3 группы (максимум).",
+                            text = if (hashCount > 1) {
+                                "Обнаружено $hashCount VK-хеша (максимум до ${hashCount * 27} потоков). Потоки распределяются поровну, сохраняя лимиты звонков VK."
+                            } else {
+                                "TURN-серверы VK выделяют сокеты пачками по 9 на сессию. 9 — 1 группа (стандарт), 18 — 2 группы (турбо), 27 — 3 группы (максимум для 1 хеша)."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

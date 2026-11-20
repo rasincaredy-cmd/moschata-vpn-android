@@ -631,7 +631,7 @@ class SettingsStore(context: Context) {
     }
 
     suspend fun saveWorkersPerHash(workers: Int) {
-        dataStore.edit { prefs -> prefs[WORKERS_PER_HASH] = workers.coerceIn(1, 36) }
+        dataStore.edit { prefs -> prefs[WORKERS_PER_HASH] = workers.coerceIn(1, MAX_TOTAL_WORKERS) }
     }
 
     suspend fun saveTurnTransport(transport: String) {
