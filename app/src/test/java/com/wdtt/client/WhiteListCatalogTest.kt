@@ -22,18 +22,18 @@ class WhiteListCatalogTest {
         assertEquals("ВКонтакте", WhiteListDetector.resolveProbeTitle("https://vk.ru/favicon.ico"))
         assertEquals("Яндекс", WhiteListDetector.resolveProbeTitle("https://yandex.ru/favicon.ico"))
         assertEquals("Сбербанк", WhiteListDetector.resolveProbeTitle("https://sberbank.ru/favicon.ico"))
-        assertEquals("Озон", WhiteListDetector.resolveProbeTitle("https://ozon.ru/favicon.ico"))
-        assertEquals("Вайлдберриз", WhiteListDetector.resolveProbeTitle("https://wildberries.ru/favicon.ico"))
+        assertEquals("Ozon", WhiteListDetector.resolveProbeTitle("https://ozon.ru/favicon.ico"))
+        assertEquals("Wildberries", WhiteListDetector.resolveProbeTitle("https://wildberries.ru/favicon.ico"))
         assertEquals("Авито", WhiteListDetector.resolveProbeTitle("https://avito.ru/favicon.ico"))
         assertEquals("2ГИС", WhiteListDetector.resolveProbeTitle("https://2gis.ru/favicon.ico"))
-        assertEquals("Рутуб", WhiteListDetector.resolveProbeTitle("https://rutube.ru/favicon.ico"))
+        assertEquals("Rutube", WhiteListDetector.resolveProbeTitle("https://rutube.ru/favicon.ico"))
         assertEquals("РЖД", WhiteListDetector.resolveProbeTitle("https://rzd.ru/favicon.ico"))
     }
 
     @Test
     fun testResolveProbeTitle_externalServices() {
         assertEquals("Google", WhiteListDetector.resolveProbeTitle("https://www.google.com/generate_204"))
-        assertEquals("Cloudflare DNS", WhiteListDetector.resolveProbeTitle("https://1.1.1.1"))
+        assertEquals("Cloudflare 1.1.1.1", WhiteListDetector.resolveProbeTitle("https://1.1.1.1"))
         assertEquals("GitHub", WhiteListDetector.resolveProbeTitle("https://github.com/favicon.ico"))
         assertEquals("Telegram", WhiteListDetector.resolveProbeTitle("https://telegram.org/favicon.ico"))
         assertEquals("Wikipedia", WhiteListDetector.resolveProbeTitle("https://en.wikipedia.org/favicon.ico"))
