@@ -5,7 +5,10 @@
     android:background="@drawable/tunnel_widget_background"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="14dp">
+    android:paddingStart="14dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
 
     <!-- Glowing Status Indicator Dot -->
     <ImageView
@@ -29,25 +32,29 @@
             android:layout_height="wrap_content"
             android:text="Moschata VPN: Отключен"
             android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
         <TextView
             android:id="@+id/widget_stats_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="1dp"
             android:text="Нажмите для подключения"
             android:textColor="#B3FFFFFF"
-            android:textSize="11sp" />
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
     </LinearLayout>
 
     <!-- Connect/Disconnect Action Button -->
     <ImageView
         android:id="@+id/widget_toggle_button"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:padding="10dp"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:padding="5dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:src="@android:drawable/ic_media_play"
         android:tint="#3DDC84"

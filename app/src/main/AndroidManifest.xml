@@ -138,7 +138,7 @@
         <service
             android:name=".QuickToggleTileService"
             android:label="Moschata VPN"
-            android:icon="@drawable/ic_tile_custom"
+            android:icon="@mipmap/ic_launcher"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">
             <intent-filter>

@@ -22,8 +22,8 @@ android {
         applicationId = "net.qwdtt.client"
         minSdk = 28
         targetSdk = 35
-        versionCode = 57
-        versionName = "1.6.0"
+        versionCode = 58
+        versionName = "1.6.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -167,4 +167,5 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("junit:junit:4.13.2")
 }

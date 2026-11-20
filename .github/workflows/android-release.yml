@@ -89,6 +89,11 @@ jobs:
             exit 1
           fi
 
+      - name: Run unit tests
+        shell: bash
+        run: |
+          ./gradlew :app:testReleaseUnitTest --no-daemon
+
       - name: Build release APKs
         shell: bash
         run: |
