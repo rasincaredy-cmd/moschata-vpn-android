@@ -101,3 +101,34 @@ CI will automatically generate a release keystore (if secrets are unset), compil
 - **Coroutines:** Use structured concurrency (`viewModelScope` or rememberCoroutineScope with `Dispatchers.IO` for network/I/O).
 - **Probing & Network:** All probe requests must use `followRedirects(false)`, `followSslRedirects(false)`, zero body reading, and prompt cancellation upon resolution.
 - **Tone:** Concise, factual, user-facing explanations without internal jargon or unnecessary code dumps.
+
+---
+
+## 6. Актуальная задача: Экспериментальная поддержка обхода через Яндекс.Документы (OpenFlux)
+
+> [!IMPORTANT]
+> **Директива Влада (21.11.2026):**  
+> Добавить в Android-клиент поддержку нового резервного подключения (обхода БС) через **Яндекс.Документы** (`docs.yandex.ru`, WSS порт 443), **пока как экспериментальную функцию**.
+
+### Архитектурные требования:
+1. **Подписки (`SubscriptionImport.kt` / `ProfilesStore.kt`):**
+   - Бот `@MoschataVPN_bot` уже отдаёт в фиде `/sub/{token}` профили нового формата:
+     ```json
+     {
+       "name": "📄 Нидерланды Резервное подключение Яндекс",
+       "type": "yandex_docs",
+       "transport": "wss",
+       "peer": "docs.yandex.ru:443",
+       "password": "<token>",
+       "server": "<host>",
+       "uri": "openflux://<password>@docs.yandex.ru:443/doc/<doc_id>?server=<host>"
+     }
+     ```
+   - Парсер должен распознавать `type == "yandex_docs"` и URI `openflux://`, не отбрасывая их как битые.
+2. **Модель `ConnectionProfile`:**
+   - Добавить поле `val protocolType: String = "qwdtt"` (значения `"qwdtt"` или `"yandex_docs"`).
+3. **UI и тумблер в `SettingsSheet.kt`:**
+   - В шторке настроек добавить блок **«Экспериментальные функции»**: тумблер *«Резервное подключение через Яндекс.Документы»* (по умолчанию включён или выключен, бейдж 🧪).
+   - В списке серверов профили Яндекса помечать иконкой `📄` и бейджем `Эксперимент`.
+4. **Сетевой транспорт:**
+   - Использовать WebSocket-клиент на OkHttp / Go-клиенте для передачи фреймов через комнату соавторства `docs.yandex.ru:443`.

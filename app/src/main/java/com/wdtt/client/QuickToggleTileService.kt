@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.net.VpnService
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -77,6 +78,7 @@ class QuickToggleTileService : TileService() {
         val tile = qsTile ?: return
         tile.state = Tile.STATE_UNAVAILABLE
         tile.label = "Moschata VPN"
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tile_moschata)
         if (Build.VERSION.SDK_INT >= 29) {
             tile.subtitle = "Подключение…"
         }
@@ -85,6 +87,7 @@ class QuickToggleTileService : TileService() {
 
     private fun updateTile(running: Boolean) {
         val tile = qsTile ?: return
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tile_moschata)
         if (running) {
             tile.state = Tile.STATE_ACTIVE
             tile.label = "Moschata: Вкл"
