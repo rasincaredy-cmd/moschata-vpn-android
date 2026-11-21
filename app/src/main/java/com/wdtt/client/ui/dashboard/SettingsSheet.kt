@@ -39,7 +39,8 @@ fun SettingsSheet(
     settingsStore: SettingsStore,
     onDismiss: () -> Unit,
     onOpenExceptions: () -> Unit,
-    onOpenLogs: () -> Unit
+    onOpenLogs: () -> Unit,
+    onShowUpdateDialog: (com.wdtt.client.AppReleaseInfo) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -419,7 +420,7 @@ fun SettingsSheet(
                                     val release = fetchLatestReleaseInfo("v${BuildConfig.VERSION_NAME}", includePrerelease = false)
                                     isCheckingUpdates = false
                                     if (release != null && isNewerVersion("v${BuildConfig.VERSION_NAME}", release.versionTag, includePrerelease = false)) {
-                                        Toast.makeText(context, "Доступна новая версия: ${release.versionTag}", Toast.LENGTH_LONG).show()
+                                        onShowUpdateDialog(release)
                                     } else {
                                         Toast.makeText(context, "У вас установлена последняя версия (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                                     }

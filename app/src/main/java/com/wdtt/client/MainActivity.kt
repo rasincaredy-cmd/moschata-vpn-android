@@ -212,7 +212,8 @@ class MainActivity : ComponentActivity() {
                     DashboardScreen(
                         settingsStore = settingsStore,
                         onToggleConnection = { toggleConnection() },
-                        onScanQr = { startQrScanner() }
+                        onScanQr = { startQrScanner() },
+                        onShowUpdateDialog = { release -> pendingRelease = release }
                     )
                 }
 
@@ -249,7 +250,20 @@ class MainActivity : ComponentActivity() {
                     AppUpdateDialog(
                         release = release,
                         onPostpone = { pendingRelease = null },
-                        onUpdate = { pendingRelease = null }
+                        onUpdate = {
+                            val url = release.releaseUrl.ifBlank { release.downloadUrl }
+                            pendingRelease = null
+                            if (!url.isNullOrBlank()) {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(this@MainActivity, "Не удалось открыть браузер: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     )
                 }
             }

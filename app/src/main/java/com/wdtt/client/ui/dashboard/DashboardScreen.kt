@@ -39,7 +39,8 @@ import kotlinx.coroutines.launch
 fun DashboardScreen(
     settingsStore: SettingsStore,
     onToggleConnection: () -> Unit,
-    onScanQr: () -> Unit
+    onScanQr: () -> Unit,
+    onShowUpdateDialog: (com.wdtt.client.AppReleaseInfo) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -314,6 +315,10 @@ fun DashboardScreen(
             onOpenLogs = {
                 showSettingsSheet = false
                 currentOverlayScreen = "logs"
+            },
+            onShowUpdateDialog = { release ->
+                showSettingsSheet = false
+                onShowUpdateDialog(release)
             }
         )
     }
