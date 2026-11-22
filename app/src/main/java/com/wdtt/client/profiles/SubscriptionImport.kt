@@ -69,6 +69,11 @@ object SubscriptionImport {
             return ParsedRemoteSubscription(profiles = listOf(single), subscriptionName = single.name)
         }
 
+        if (jsonStr.startsWith("openflux://") || jsonStr.startsWith("openflux:")) {
+            val single = parseOpenFluxUri(jsonStr) ?: return null
+            return ParsedRemoteSubscription(profiles = listOf(single), subscriptionName = single.name)
+        }
+
         var description = ""
         var trafficUsed = 0.0
         var trafficLimit = 0.0
@@ -142,14 +147,42 @@ object SubscriptionImport {
     }
 
     private fun parseProfileObject(jsonObj: JSONObject): ConnectionProfile? {
-        val name = jsonObj.optString("name", "Imported")
-        val peer = jsonObj.optString("peer", "")
+        val type = jsonObj.optString("type", "").trim().lowercase()
+        val uriStr = jsonObj.optString("uri", "").trim()
+        val isYandexDocs = type == "yandex_docs" || type == "openflux" || uriStr.startsWith("openflux://", ignoreCase = true) || uriStr.startsWith("openflux:", ignoreCase = true)
+
+        var peer = jsonObj.optString("peer", "").trim()
+        if (peer.isBlank() && uriStr.isNotBlank()) {
+            val parsed = parseOpenFluxUri(uriStr)
+            if (parsed != null) peer = parsed.peer
+        }
+        if (peer.isBlank() && isYandexDocs) {
+            peer = "docs.yandex.ru:443"
+        }
         if (peer.isBlank()) return null
+
+        val defaultName = if (isYandexDocs) "📄 Яндекс.Документы" else "Imported"
+        var name = jsonObj.optString("name", defaultName).trim()
+        if (isYandexDocs && !name.contains("📄")) {
+            name = "📄 $name"
+        }
+
         val hashes = jsonObj.optString("hashes", jsonObj.optString("vkHashes", ""))
         val workers = jsonObj.optInt("workers", jsonObj.optInt("workersPerHash", 9))
         val port = jsonObj.optInt("port", jsonObj.optInt("listenPort", 9000))
-        val pass = jsonObj.optString("password", jsonObj.optString("pass", ""))
+        var pass = jsonObj.optString("password", jsonObj.optString("pass", jsonObj.optString("token", "")))
+        if (pass.isBlank() && uriStr.isNotBlank()) {
+            val parsed = parseOpenFluxUri(uriStr)
+            if (parsed != null && parsed.password.isNotBlank()) {
+                pass = parsed.password
+            }
+        }
+
         val traffic = jsonObj.optDouble("trafficMb", jsonObj.optDouble("trafficUsedMb", 0.0))
+        val serverHost = jsonObj.optString("server", "")
+        val diagKey = jsonObj.optString("diagKey", jsonObj.optString("dk", serverHost)).trim()
+        val protocolType = if (isYandexDocs) ConnectionProfile.PROTOCOL_YANDEX_DOCS else ConnectionProfile.PROTOCOL_QWDTT
+
         return ConnectionProfile(
             id = UUID.randomUUID().toString(),
             name = name,
@@ -160,9 +193,84 @@ object SubscriptionImport {
             password = pass,
             trafficMb = traffic.coerceAtLeast(0.0),
             groupId = "",
-            useGlobalHashes = hashes.isBlank(),
-            diagKey = jsonObj.optString("diagKey", jsonObj.optString("dk", "")).trim()
+            useGlobalHashes = if (isYandexDocs) false else hashes.isBlank(),
+            diagKey = diagKey,
+            protocolType = protocolType
         )
+    }
+
+    private fun parseOpenFluxUri(rawUri: String): ConnectionProfile? {
+        val trimmed = rawUri.trim()
+        return try {
+            val uri = runCatching { android.net.Uri.parse(trimmed) }.getOrNull()
+            val uriString = trimmed.removePrefix("openflux://").removePrefix("openflux:")
+
+            // Extract userInfo / password
+            var password = uri?.userInfo.orEmpty()
+            var remainder = uriString
+            if (password.isEmpty() && remainder.contains("@")) {
+                val atIdx = remainder.indexOf("@")
+                password = remainder.substring(0, atIdx)
+                remainder = remainder.substring(atIdx + 1)
+            }
+            if (password.isEmpty()) {
+                password = uri?.getQueryParameter("password")
+                    ?: uri?.getQueryParameter("pass")
+                    ?: uri?.getQueryParameter("token")
+                    ?: ""
+            }
+
+            // Extract host and port
+            var host = uri?.host.orEmpty()
+            var port = uri?.port ?: -1
+            if (host.isEmpty()) {
+                val slashIdx = remainder.indexOf("/")
+                val hostPort = if (slashIdx != -1) remainder.substring(0, slashIdx) else remainder.substringBefore("?")
+                if (hostPort.contains(":")) {
+                    host = hostPort.substringBefore(":")
+                    port = hostPort.substringAfter(":").toIntOrNull() ?: 443
+                } else {
+                    host = hostPort
+                    port = 443
+                }
+            }
+            if (host.isEmpty()) host = "docs.yandex.ru"
+            if (port <= 0) port = 443
+            val peer = "$host:$port"
+
+            // Extract query parameters: server, name
+            var server = uri?.getQueryParameter("server").orEmpty()
+            var name = uri?.getQueryParameter("name").orEmpty()
+            if (server.isEmpty() && trimmed.contains("server=")) {
+                server = Regex("[?&]server=([^&]+)").find(trimmed)?.groupValues?.getOrNull(1).orEmpty()
+            }
+            if (name.isEmpty() && trimmed.contains("name=")) {
+                name = Regex("[?&]name=([^&]+)").find(trimmed)?.groupValues?.getOrNull(1).orEmpty()
+                name = runCatching { java.net.URLDecoder.decode(name, "UTF-8") }.getOrDefault(name)
+            }
+            if (name.isEmpty()) {
+                name = "📄 Яндекс.Документы"
+            } else if (!name.startsWith("📄")) {
+                name = "📄 $name"
+            }
+
+            ConnectionProfile(
+                id = UUID.randomUUID().toString(),
+                name = name,
+                peer = peer,
+                vkHashes = "",
+                workersPerHash = 9,
+                listenPort = 9000,
+                password = password,
+                trafficMb = 0.0,
+                groupId = "",
+                useGlobalHashes = false,
+                diagKey = server,
+                protocolType = ConnectionProfile.PROTOCOL_YANDEX_DOCS
+            )
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun parseQwdttUri(trimmed: String): ConnectionProfile? {

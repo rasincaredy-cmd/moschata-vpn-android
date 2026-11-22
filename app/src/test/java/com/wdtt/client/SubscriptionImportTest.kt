@@ -1,0 +1,148 @@
+package com.wdtt.client
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SubscriptionImportTest {
+
+    @Test
+    fun testStandardProfilesParsing_mainVpnUnchanged() {
+        val json = """
+            {
+                "subscriptionName": "Moschata VPN Test",
+                "profiles": [
+                    {
+                        "name": "Нидерланды WireGuard",
+                        "peer": "48.102.173.96:585",
+                        "password": "secret_wg_pass",
+                        "workers": 9,
+                        "port": 9000
+                    },
+                    {
+                        "name": "Нидерланды Обход БС",
+                        "peer": "48.102.173.96:56000",
+                        "hashes": "vk_hash_1,vk_hash_2",
+                        "password": "secret_bypass_pass",
+                        "workers": 18,
+                        "port": 9000,
+                        "dk": "diag_test_key"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull("Payload must be parsed successfully", parsed)
+        assertEquals("Moschata VPN Test", parsed!!.subscriptionName)
+        assertEquals(2, parsed.profiles.size)
+
+        val wg = parsed.profiles[0]
+        assertEquals("Нидерланды WireGuard", wg.name)
+        assertEquals("48.102.173.96:585", wg.peer)
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, wg.protocolType)
+        assertFalse("Standard WG profile must NOT be marked as YandexDocs", wg.isYandexDocs)
+        assertTrue("Empty hashes profile should use global hashes", wg.useGlobalHashes)
+
+        val bypass = parsed.profiles[1]
+        assertEquals("Нидерланды Обход БС", bypass.name)
+        assertEquals("48.102.173.96:56000", bypass.peer)
+        assertEquals("vk_hash_1,vk_hash_2", bypass.vkHashes)
+        assertEquals(18, bypass.workersPerHash)
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, bypass.protocolType)
+        assertFalse("qWDTT bypass profile must NOT be marked as YandexDocs", bypass.isYandexDocs)
+        assertFalse("Profile with specific hashes must not use global hashes", bypass.useGlobalHashes)
+        assertEquals("diag_test_key", bypass.diagKey)
+    }
+
+    @Test
+    fun testYandexDocsProfileParsing_notDropped() {
+        val json = """
+            {
+                "subscriptionName": "Moschata Premium",
+                "profiles": [
+                    {
+                        "name": "Нидерланды Резервное подключение Яндекс",
+                        "type": "yandex_docs",
+                        "transport": "wss",
+                        "peer": "docs.yandex.ru:443",
+                        "password": "auth_token_yandex_123",
+                        "server": "48.102.173.96",
+                        "uri": "openflux://auth_token_yandex_123@docs.yandex.ru:443/doc/doc_uuid_456?server=48.102.173.96"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull("YandexDocs payload must not be dropped", parsed)
+        assertEquals(1, parsed!!.profiles.size)
+
+        val profile = parsed.profiles[0]
+        assertTrue("Name should retain or have document indicator", profile.name.contains("Яндекс"))
+        assertEquals("docs.yandex.ru:443", profile.peer)
+        assertEquals(ConnectionProfile.PROTOCOL_YANDEX_DOCS, profile.protocolType)
+        assertTrue("Must be marked as isYandexDocs", profile.isYandexDocs)
+        assertFalse("YandexDocs must not use VK global hashes", profile.useGlobalHashes)
+        assertEquals("auth_token_yandex_123", profile.password)
+        assertEquals("48.102.173.96", profile.diagKey)
+    }
+
+    @Test
+    fun testOpenFluxUriParsing_directLink() {
+        val uri = "openflux://super_secret_token@docs.yandex.ru:443/doc/room999?server=13.143.175.31&name=Резерв"
+        val parsed = SubscriptionImport.parsePayload(uri)
+        assertNotNull("Direct openflux URI must be parsed", parsed)
+        assertEquals(1, parsed!!.profiles.size)
+
+        val profile = parsed.profiles[0]
+        assertEquals(ConnectionProfile.PROTOCOL_YANDEX_DOCS, profile.protocolType)
+        assertTrue(profile.isYandexDocs)
+        assertEquals("docs.yandex.ru:443", profile.peer)
+        assertEquals("super_secret_token", profile.password)
+        assertEquals("13.143.175.31", profile.diagKey)
+        assertTrue(profile.name.contains("Резерв"))
+    }
+
+    @Test
+    fun testMixedSubscription_preservesIntegrity() {
+        val json = """
+            [
+                {
+                    "groupName": "Moschata Multi",
+                    "name": "Основной WireGuard",
+                    "peer": "48.102.173.96:585",
+                    "password": "pass1"
+                },
+                {
+                    "name": "Обход VK TURN",
+                    "peer": "48.102.173.96:56000",
+                    "hashes": "hash1",
+                    "password": "pass2"
+                },
+                {
+                    "name": "Резерв Яндекс",
+                    "type": "yandex_docs",
+                    "peer": "docs.yandex.ru:443",
+                    "password": "pass3",
+                    "server": "48.102.173.96"
+                }
+            ]
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull(parsed)
+        assertEquals(3, parsed!!.profiles.size)
+
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, parsed.profiles[0].protocolType)
+        assertFalse(parsed.profiles[0].isYandexDocs)
+
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, parsed.profiles[1].protocolType)
+        assertFalse(parsed.profiles[1].isYandexDocs)
+
+        assertEquals(ConnectionProfile.PROTOCOL_YANDEX_DOCS, parsed.profiles[2].protocolType)
+        assertTrue(parsed.profiles[2].isYandexDocs)
+    }
+}

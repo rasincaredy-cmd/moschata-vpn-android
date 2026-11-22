@@ -53,9 +53,12 @@ fun DashboardScreen(
     val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
     val currentPeer by settingsStore.peer.collectAsStateWithLifecycle(initialValue = "")
     val currentHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
+    val currentProfileId by settingsStore.currentProfileId.collectAsStateWithLifecycle(initialValue = "")
     val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
 
-    val isBypass = currentHashes.isNotBlank() || currentPeer.contains(":5600")
+    val activeProfile = remember(profiles, currentProfileId) { profiles.find { it.id == currentProfileId } }
+    val isYandexDocs = activeProfile?.isYandexDocs == true || activeProfile?.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS || currentProfileName.contains("Яндекс", ignoreCase = true)
+    val isBypass = (currentHashes.isNotBlank() || currentPeer.contains(":5600")) && !isYandexDocs
     val hasActiveServer = (currentProfileName.isNotBlank() || currentPeer.isNotBlank()) && profiles.isNotEmpty()
 
     val visualState = when {
@@ -255,7 +258,14 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(if (hasActiveServer) "🇳🇱" else "🌐", fontSize = 22.sp)
+                        Text(
+                            text = when {
+                                isYandexDocs -> "📄"
+                                hasActiveServer -> "🇳🇱"
+                                else -> "🌐"
+                            },
+                            fontSize = 22.sp
+                        )
                         Column {
                             Text(
                                 text = if (hasActiveServer) currentProfileName.ifBlank { "Сервер WireGuard" } else "Сервер не выбран",
@@ -264,12 +274,20 @@ fun DashboardScreen(
                             )
                             Text(
                                 text = if (hasActiveServer) {
-                                    if (isBypass) "Режим: Обход БС (VK TURN) ⚡" else "Режим: Скоростной WireGuard"
+                                    when {
+                                        isYandexDocs -> "Режим: Эксперимент (Яндекс.Документы) 🧪"
+                                        isBypass -> "Режим: Обход БС (VK TURN) ⚡"
+                                        else -> "Режим: Скоростной WireGuard"
+                                    }
                                 } else {
                                     "Нажмите, чтобы добавить сервер или подписку"
                                 },
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (hasActiveServer && isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary
+                                color = when {
+                                    hasActiveServer && isYandexDocs -> Color(0xFFFFB74D)
+                                    hasActiveServer && isBypass -> Color(0xFF9D4EDD)
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
                             )
                         }
                     }

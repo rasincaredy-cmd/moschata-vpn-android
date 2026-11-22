@@ -27,8 +27,18 @@ data class ConnectionProfile(
     val groupId: String = "",
     val useGlobalHashes: Boolean = vkHashes.isBlank(),
     /** Ключ диагностики сервера (dk= из ссылки бота), пусто — нет. */
-    val diagKey: String = ""
-)
+    val diagKey: String = "",
+    /** Тип протокола подключения: "qwdtt" (по умолчанию) или "yandex_docs". */
+    val protocolType: String = PROTOCOL_QWDTT
+) {
+    companion object {
+        const val PROTOCOL_QWDTT = "qwdtt"
+        const val PROTOCOL_YANDEX_DOCS = "yandex_docs"
+    }
+
+    val isYandexDocs: Boolean
+        get() = protocolType == PROTOCOL_YANDEX_DOCS
+}
 
 data class ProfileGroup(
     val id: String,
@@ -67,6 +77,7 @@ class ProfilesStore(context: Context) {
         private fun trafficKey(id: String) = androidx.datastore.preferences.core.doublePreferencesKey("profile_traffic_$id")
         private fun groupIdKey(id: String) = stringPreferencesKey("profile_group_id_$id")
         private fun diagKeyKey(id: String) = stringPreferencesKey("profile_diag_key_enc_$id")
+        private fun protocolTypeKey(id: String) = stringPreferencesKey("profile_protocol_type_$id")
 
         private const val GROUPS_IDS_KEY = "groups_ids"
         private fun groupsIdsKey() = stringPreferencesKey(GROUPS_IDS_KEY)
@@ -107,7 +118,8 @@ class ProfilesStore(context: Context) {
                 val groupId = prefs[groupIdKey(id)] ?: ""
                 val useGlobal = prefs[useGlobalHashesKey(id)] ?: true
                 val diagKey = secureStore.decrypt(prefs[diagKeyKey(id)] ?: "") ?: ""
-                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey))
+                val protocolType = prefs[protocolTypeKey(id)] ?: ConnectionProfile.PROTOCOL_QWDTT
+                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType))
             }
             list
         }
@@ -342,6 +354,7 @@ class ProfilesStore(context: Context) {
             prefs[trafficKey(profile.id)] = profile.trafficMb
             prefs[groupIdKey(profile.id)] = profile.groupId
             prefs[useGlobalHashesKey(profile.id)] = profile.useGlobalHashes
+            prefs[protocolTypeKey(profile.id)] = profile.protocolType
             if (profile.diagKey.isBlank()) {
                 prefs.remove(diagKeyKey(profile.id))
             } else {
@@ -376,6 +389,7 @@ class ProfilesStore(context: Context) {
             prefs.remove(trafficKey(id))
             prefs.remove(groupIdKey(id))
             prefs.remove(diagKeyKey(id))
+            prefs.remove(protocolTypeKey(id))
         }
     }
 

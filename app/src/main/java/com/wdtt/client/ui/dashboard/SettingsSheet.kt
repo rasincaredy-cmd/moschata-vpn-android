@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ fun SettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
+    val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
     val connectionMode by settingsStore.connectionMode.collectAsStateWithLifecycle(initialValue = SettingsStore.CONNECTION_MODE_VPN)
     val workersPerHash by settingsStore.workersPerHash.collectAsStateWithLifecycle(initialValue = 9)
     val vkHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
@@ -364,7 +366,68 @@ fun SettingsSheet(
                 }
             }
 
-            // Секция 5: Диагностика и обновление
+            // Секция 5: Экспериментальные функции
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Экспериментальные функции",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFFF9800).copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "🧪 BETA",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFB74D),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Резервное подключение через Яндекс.Документы", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Маскировка трафика через протокол OpenFlux и защищенный WSS-канал docs.yandex.ru:443",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = yandexDocsEnabled,
+                            onCheckedChange = { checked ->
+                                scope.launch { settingsStore.saveYandexDocsEnabled(checked) }
+                            }
+                        )
+                    }
+
+                    if (yandexDocsEnabled) {
+                        Text(
+                            text = "Профили с поддержкой Яндекс.Документов помечаются значком 📄 и бейджем «Эксперимент» в списке серверов.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFFFB74D)
+                        )
+                    }
+                }
+            }
+
+            // Секция 6: Отладка и обновления
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),

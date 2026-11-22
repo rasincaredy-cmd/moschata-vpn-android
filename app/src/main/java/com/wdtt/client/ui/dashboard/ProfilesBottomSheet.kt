@@ -42,6 +42,7 @@ fun ProfilesBottomSheet(
     val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
     val currentProfileId by settingsStore.currentProfileId.collectAsStateWithLifecycle(initialValue = "")
+    val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
 
     var showAddDialog by remember { mutableStateOf(false) }
     var subscriptionUrlInput by remember { mutableStateOf("") }
@@ -155,6 +156,8 @@ fun ProfilesBottomSheet(
                         val isSelected = profile.id == currentProfileId
                         val isBypass = profile.vkHashes.isNotBlank() || profile.peer.contains(":5600")
 
+                        val isYd = profile.isYandexDocs || profile.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
+
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -169,6 +172,10 @@ fun ProfilesBottomSheet(
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable {
                                     scope.launch {
+                                        if (isYd && !yandexDocsEnabled) {
+                                            settingsStore.saveYandexDocsEnabled(true)
+                                            Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
+                                        }
                                         profilesStore.applyProfile(context, profile.id)
                                         onDismiss()
                                     }
@@ -184,7 +191,11 @@ fun ProfilesBottomSheet(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Text(
-                                        text = if (profile.name.contains("Нидерланд", ignoreCase = true) || profile.peer.contains("48.102") || profile.peer.contains("13.143")) "🇳🇱" else "🌐",
+                                        text = when {
+                                            isYd -> "📄"
+                                            profile.name.contains("Нидерланд", ignoreCase = true) || profile.peer.contains("48.102") || profile.peer.contains("13.143") -> "🇳🇱"
+                                            else -> "🌐"
+                                        },
                                         style = MaterialTheme.typography.headlineSmall
                                     )
 
@@ -198,17 +209,44 @@ fun ProfilesBottomSheet(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(6.dp),
-                                                color = if (isBypass) Color(0xFF7C4DFF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                            ) {
-                                                Text(
-                                                    text = if (isBypass) "Обход БС ⚡" else "WireGuard",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = if (isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
+                                            if (isYd) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Color(0xFFFF9800).copy(alpha = 0.2f)
+                                                ) {
+                                                    Text(
+                                                        text = "Эксперимент 🧪",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color(0xFFFFB74D),
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Color(0xFF2196F3).copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = "Яндекс.Документы",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = Color(0xFF64B5F6),
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            } else {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = if (isBypass) Color(0xFF7C4DFF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = if (isBypass) "Обход БС ⚡" else "WireGuard",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = if (isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
