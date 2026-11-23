@@ -145,4 +145,68 @@ class SubscriptionImportTest {
         assertEquals(ConnectionProfile.PROTOCOL_YANDEX_DOCS, parsed.profiles[2].protocolType)
         assertTrue(parsed.profiles[2].isYandexDocs)
     }
+
+    @Test
+    fun testDeviceTypeDetection_phoneVsPc() {
+        val json = """
+            {
+                "subscriptionName": "Moschata Sub",
+                "profiles": [
+                    {
+                        "name": "⚡ Нидерланды Резервное подключение (Телефон)",
+                        "peer": "48.102.173.96:56000",
+                        "password": "pass_phone",
+                        "device": "phone"
+                    },
+                    {
+                        "name": "⚡ Нидерланды Резервное подключение (Комп)",
+                        "peer": "48.102.173.96:56000",
+                        "password": "pass_pc",
+                        "device": "pc"
+                    },
+                    {
+                        "name": "Домашний Компьютер Windows",
+                        "peer": "48.102.173.96:56000",
+                        "password": "pass_win"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull(parsed)
+        assertEquals(3, parsed!!.profiles.size)
+
+        val phoneProfile = parsed.profiles[0]
+        assertEquals(ConnectionProfile.DEVICE_PHONE, phoneProfile.deviceType)
+        assertFalse(phoneProfile.isPcDevice)
+
+        val pcProfile = parsed.profiles[1]
+        assertEquals(ConnectionProfile.DEVICE_PC, pcProfile.deviceType)
+        assertTrue(pcProfile.isPcDevice)
+
+        val nameDetectedPcProfile = parsed.profiles[2]
+        assertEquals(ConnectionProfile.DEVICE_PC, nameDetectedPcProfile.deviceType)
+        assertTrue(nameDetectedPcProfile.isPcDevice)
+    }
+
+    @Test
+    fun testPortNormalization_rewrites56003ToDtls56000() {
+        val json = """
+            {
+                "profiles": [
+                    {
+                        "name": "Резерв Raw Port Feed",
+                        "peer": "48.102.173.96:56003",
+                        "password": "pass"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull(parsed)
+        assertEquals(1, parsed!!.profiles.size)
+        assertEquals("48.102.173.96:56000", parsed.profiles[0].peer)
+    }
 }

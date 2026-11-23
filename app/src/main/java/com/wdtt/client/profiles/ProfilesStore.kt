@@ -29,15 +29,23 @@ data class ConnectionProfile(
     /** Ключ диагностики сервера (dk= из ссылки бота), пусто — нет. */
     val diagKey: String = "",
     /** Тип протокола подключения: "qwdtt" (по умолчанию) или "yandex_docs". */
-    val protocolType: String = PROTOCOL_QWDTT
+    val protocolType: String = PROTOCOL_QWDTT,
+    /** Тип устройства: "phone" (по умолчанию) или "pc". */
+    val deviceType: String = DEVICE_PHONE
 ) {
     companion object {
         const val PROTOCOL_QWDTT = "qwdtt"
         const val PROTOCOL_YANDEX_DOCS = "yandex_docs"
+
+        const val DEVICE_PHONE = "phone"
+        const val DEVICE_PC = "pc"
     }
 
     val isYandexDocs: Boolean
         get() = protocolType == PROTOCOL_YANDEX_DOCS
+
+    val isPcDevice: Boolean
+        get() = deviceType == DEVICE_PC
 }
 
 data class ProfileGroup(
@@ -78,6 +86,7 @@ class ProfilesStore(context: Context) {
         private fun groupIdKey(id: String) = stringPreferencesKey("profile_group_id_$id")
         private fun diagKeyKey(id: String) = stringPreferencesKey("profile_diag_key_enc_$id")
         private fun protocolTypeKey(id: String) = stringPreferencesKey("profile_protocol_type_$id")
+        private fun deviceTypeKey(id: String) = stringPreferencesKey("profile_device_type_$id")
 
         private const val GROUPS_IDS_KEY = "groups_ids"
         private fun groupsIdsKey() = stringPreferencesKey(GROUPS_IDS_KEY)
@@ -119,7 +128,8 @@ class ProfilesStore(context: Context) {
                 val useGlobal = prefs[useGlobalHashesKey(id)] ?: true
                 val diagKey = secureStore.decrypt(prefs[diagKeyKey(id)] ?: "") ?: ""
                 val protocolType = prefs[protocolTypeKey(id)] ?: ConnectionProfile.PROTOCOL_QWDTT
-                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType))
+                val deviceType = prefs[deviceTypeKey(id)] ?: ConnectionProfile.DEVICE_PHONE
+                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType))
             }
             list
         }
@@ -355,6 +365,7 @@ class ProfilesStore(context: Context) {
             prefs[groupIdKey(profile.id)] = profile.groupId
             prefs[useGlobalHashesKey(profile.id)] = profile.useGlobalHashes
             prefs[protocolTypeKey(profile.id)] = profile.protocolType
+            prefs[deviceTypeKey(profile.id)] = profile.deviceType
             if (profile.diagKey.isBlank()) {
                 prefs.remove(diagKeyKey(profile.id))
             } else {
@@ -390,6 +401,7 @@ class ProfilesStore(context: Context) {
             prefs.remove(groupIdKey(id))
             prefs.remove(diagKeyKey(id))
             prefs.remove(protocolTypeKey(id))
+            prefs.remove(deviceTypeKey(id))
         }
     }
 
@@ -446,9 +458,9 @@ class ProfilesStore(context: Context) {
         }
     }
 
-    suspend fun createProfile(name: String, peer: String, vkHashes: String, workers: Int, listenPort: Int, password: String, groupId: String = ""): ConnectionProfile {
+    suspend fun createProfile(name: String, peer: String, vkHashes: String, workers: Int, listenPort: Int, password: String, groupId: String = "", deviceType: String = ConnectionProfile.DEVICE_PHONE): ConnectionProfile {
         val id = UUID.randomUUID().toString()
-        val p = ConnectionProfile(id, name, peer, vkHashes, workers, listenPort, password, 0.0, groupId)
+        val p = ConnectionProfile(id, name, peer, vkHashes, workers, listenPort, password, 0.0, groupId, deviceType = deviceType)
         saveProfile(p)
         return p
     }
@@ -466,7 +478,9 @@ class ProfilesStore(context: Context) {
         val groupId = prefs[groupIdKey(id)] ?: ""
         val useGlobal = prefs[useGlobalHashesKey(id)] ?: hashes.isBlank()
         val diagKey = secureStore.decrypt(prefs[diagKeyKey(id)] ?: "") ?: ""
-        return ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey)
+        val protocolType = prefs[protocolTypeKey(id)] ?: ConnectionProfile.PROTOCOL_QWDTT
+        val deviceType = prefs[deviceTypeKey(id)] ?: ConnectionProfile.DEVICE_PHONE
+        return ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType)
     }
 
     suspend fun incrementProfileTraffic(id: String, additionalTrafficMb: Double) = withContext(Dispatchers.IO) {

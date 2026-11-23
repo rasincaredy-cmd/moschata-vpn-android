@@ -167,6 +167,22 @@ object SubscriptionImport {
             name = "📄 $name"
         }
 
+        val rawDevice = jsonObj.optString("device", jsonObj.optString("deviceType", "")).trim().lowercase()
+        val isPc = rawDevice == "pc" || rawDevice == "windows" || rawDevice == "desktop" ||
+            name.contains("комп", ignoreCase = true) ||
+            name.contains("пк", ignoreCase = true) ||
+            name.contains("pc", ignoreCase = true) ||
+            name.contains("windows", ignoreCase = true) ||
+            name.contains("десктоп", ignoreCase = true) ||
+            name.contains("ноутбук", ignoreCase = true)
+        val deviceType = if (isPc) ConnectionProfile.DEVICE_PC else ConnectionProfile.DEVICE_PHONE
+
+        // Нормализация порта для qWDTT: если в ссылке зашит 56003 (raw-порт), для базового профиля
+        // используем стандартный 56000 (DTLS), а на 56003 клиент переключается сам при выборе режима Raw.
+        if (!isYandexDocs && peer.endsWith(":56003")) {
+            peer = peer.replace(":56003", ":56000")
+        }
+
         val hashes = jsonObj.optString("hashes", jsonObj.optString("vkHashes", ""))
         val workers = jsonObj.optInt("workers", jsonObj.optInt("workersPerHash", 9))
         val port = jsonObj.optInt("port", jsonObj.optInt("listenPort", 9000))
@@ -195,7 +211,8 @@ object SubscriptionImport {
             groupId = "",
             useGlobalHashes = if (isYandexDocs) false else hashes.isBlank(),
             diagKey = diagKey,
-            protocolType = protocolType
+            protocolType = protocolType,
+            deviceType = deviceType
         )
     }
 
@@ -254,6 +271,12 @@ object SubscriptionImport {
                 name = "📄 $name"
             }
 
+            val isPc = trimmed.contains("device=pc", ignoreCase = true) ||
+                name.contains("комп", ignoreCase = true) ||
+                name.contains("пк", ignoreCase = true) ||
+                name.contains("pc", ignoreCase = true)
+            val deviceType = if (isPc) ConnectionProfile.DEVICE_PC else ConnectionProfile.DEVICE_PHONE
+
             ConnectionProfile(
                 id = UUID.randomUUID().toString(),
                 name = name,
@@ -266,7 +289,8 @@ object SubscriptionImport {
                 groupId = "",
                 useGlobalHashes = false,
                 diagKey = server,
-                protocolType = ConnectionProfile.PROTOCOL_YANDEX_DOCS
+                protocolType = ConnectionProfile.PROTOCOL_YANDEX_DOCS,
+                deviceType = deviceType
             )
         } catch (_: Exception) {
             null
@@ -282,6 +306,12 @@ object SubscriptionImport {
             val workers = uri.getQueryParameter("workers")?.toIntOrNull() ?: 9
             val port = uri.getQueryParameter("port")?.toIntOrNull() ?: 9000
             val pass = uri.getQueryParameter("pass") ?: uri.getQueryParameter("password") ?: ""
+            val isPc = trimmed.contains("device=pc", ignoreCase = true) ||
+                name.contains("комп", ignoreCase = true) ||
+                name.contains("пк", ignoreCase = true) ||
+                name.contains("pc", ignoreCase = true)
+            val deviceType = if (isPc) ConnectionProfile.DEVICE_PC else ConnectionProfile.DEVICE_PHONE
+
             ConnectionProfile(
                 id = UUID.randomUUID().toString(),
                 name = name,
@@ -291,7 +321,8 @@ object SubscriptionImport {
                 listenPort = port,
                 password = pass,
                 useGlobalHashes = hashes.isBlank(),
-                diagKey = uri.getQueryParameter("dk").orEmpty().trim()
+                diagKey = uri.getQueryParameter("dk").orEmpty().trim(),
+                deviceType = deviceType
             )
         } catch (_: Exception) {
             null

@@ -101,7 +101,7 @@ class TunnelService : Service() {
                             else -> serverDtlsPort
                         }
                         val peerWithPort = if (basePeer.isBlank()) basePeer
-                            else if (isRawTun || noDtlsEnabled) PeerAddress.withPort(basePeer, effectiveServerPort)
+                            else if (isRawTun || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003)) PeerAddress.withPort(basePeer, effectiveServerPort)
                             else PeerAddress.ensurePort(basePeer, effectiveServerPort)
                         val vkAnonPath = SettingsStore.normalizeVkAnonPath(
                             intent.getStringExtra("vk_anon_path")?.takeIf { it.isNotEmpty() }
@@ -196,7 +196,7 @@ class TunnelService : Service() {
                     else -> serverDtlsPort
                 }
                 val peerWithPort = if (basePeer.isBlank()) basePeer
-                    else if (isRawTunRestore || noDtlsEnabled) PeerAddress.withPort(basePeer, effectiveServerPort)
+                    else if (isRawTunRestore || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003)) PeerAddress.withPort(basePeer, effectiveServerPort)
                     else PeerAddress.ensurePort(basePeer, effectiveServerPort)
                 val params = TunnelParams(
                     peer = peerWithPort,

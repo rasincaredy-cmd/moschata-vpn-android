@@ -25,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.ConnectionProfile
 import com.wdtt.client.ProfilesStore
 import com.wdtt.client.SettingsStore
+import com.wdtt.client.profiles.ProfileUnbindHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +48,13 @@ fun ProfilesBottomSheet(
     var showAddDialog by remember { mutableStateOf(false) }
     var subscriptionUrlInput by remember { mutableStateOf("") }
     var isSyncing by remember { mutableStateOf(false) }
+    var unbindTargetProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
+    var isUnbinding by remember { mutableStateOf(false) }
+    var pcConfirmProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
+
+    val sortedProfiles = remember(profiles) {
+        profiles.sortedWith(compareBy<ConnectionProfile> { it.isPcDevice }.thenBy { it.name })
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -152,11 +160,11 @@ fun ProfilesBottomSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
                 ) {
-                    items(profiles, key = { it.id }) { profile ->
+                    items(sortedProfiles, key = { it.id }) { profile ->
                         val isSelected = profile.id == currentProfileId
                         val isBypass = profile.vkHashes.isNotBlank() || profile.peer.contains(":5600")
-
                         val isYd = profile.isYandexDocs || profile.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
+                        val isPc = profile.isPcDevice
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -171,13 +179,17 @@ fun ProfilesBottomSheet(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable {
-                                    scope.launch {
-                                        if (isYd && !yandexDocsEnabled) {
-                                            settingsStore.saveYandexDocsEnabled(true)
-                                            Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
+                                    if (isPc && !isSelected) {
+                                        pcConfirmProfile = profile
+                                    } else {
+                                        scope.launch {
+                                            if (isYd && !yandexDocsEnabled) {
+                                                settingsStore.saveYandexDocsEnabled(true)
+                                                Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
+                                            }
+                                            profilesStore.applyProfile(context, profile.id)
+                                            onDismiss()
                                         }
-                                        profilesStore.applyProfile(context, profile.id)
-                                        onDismiss()
                                     }
                                 }
                         ) {
@@ -188,18 +200,20 @@ fun ProfilesBottomSheet(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
                                 ) {
                                     Text(
                                         text = when {
                                             isYd -> "📄"
+                                            isPc -> "💻"
                                             profile.name.contains("Нидерланд", ignoreCase = true) || profile.peer.contains("48.102") || profile.peer.contains("13.143") -> "🇳🇱"
                                             else -> "🌐"
                                         },
                                         style = MaterialTheme.typography.headlineSmall
                                     )
 
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(
                                             text = profile.name.ifBlank { "Сервер ${profile.peer}" },
                                             style = MaterialTheme.typography.bodyLarge,
@@ -248,23 +262,55 @@ fun ProfilesBottomSheet(
                                                     )
                                                 }
                                             }
+
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (isPc) Color(0xFF607D8B).copy(alpha = 0.2f) else Color(0xFF009688).copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = if (isPc) "Компьютер 💻" else "Телефон 📱",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (isPc) Color(0xFFB0BEC5) else Color(0xFF80CBC4),
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
 
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(26.dp)
-                                            .background(MaterialTheme.colorScheme.primary, CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Check,
-                                            contentDescription = "Выбран",
-                                            tint = MaterialTheme.colorScheme.onPrimary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (isBypass && profile.password.isNotBlank()) {
+                                        IconButton(
+                                            onClick = { unbindTargetProfile = profile },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.LinkOff,
+                                                contentDescription = "Отвязать устройство",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    if (isSelected) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Check,
+                                                contentDescription = "Выбран",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -329,6 +375,113 @@ fun ProfilesBottomSheet(
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (pcConfirmProfile != null) {
+        val target = pcConfirmProfile!!
+        AlertDialog(
+            onDismissRequest = { pcConfirmProfile = null },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("💻", style = MaterialTheme.typography.titleLarge)
+                    Text("Профиль для ПК", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    "Профиль «${target.name}» предназначен для компьютера (ПК).\n\n" +
+                    "Если вы подключитесь к нему со смартфона, сервер может сбросить привязку ПК или ответить ошибкой «Неверный пароль».\n\n" +
+                    "Всё равно переключиться на этот профиль?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pcConfirmProfile = null
+                        scope.launch {
+                            val isYd = target.isYandexDocs || target.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
+                            if (isYd && !yandexDocsEnabled) {
+                                settingsStore.saveYandexDocsEnabled(true)
+                                Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
+                            }
+                            profilesStore.applyProfile(context, target.id)
+                            onDismiss()
+                        }
+                    }
+                ) {
+                    Text("Подключить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pcConfirmProfile = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (unbindTargetProfile != null) {
+        val target = unbindTargetProfile!!
+        AlertDialog(
+            onDismissRequest = { if (!isUnbinding) unbindTargetProfile = null },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Filled.LinkOff, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                    Text("Отвязать устройство", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text(
+                    "Сбросить привязку устройства для профиля «${target.name}»?\n\n" +
+                    "Сервер очистит запомненный идентификатор устройства (Device ID). Это решает проблему неверного пароля при переносе профиля или смене приложения.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isUnbinding = true
+                            val res = ProfileUnbindHelper.unbindProfile(context, target, unbindAllDevices = true)
+                            isUnbinding = false
+                            unbindTargetProfile = null
+                            if (res.isSuccess) {
+                                Toast.makeText(context, "✅ Привязка устройства успешно сброшена!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "❌ Ошибка: ${res.exceptionOrNull()?.message ?: "Сбой"}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    enabled = !isUnbinding
+                ) {
+                    if (isUnbinding) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onError,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Отвязать", color = MaterialTheme.colorScheme.onError)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { unbindTargetProfile = null },
+                    enabled = !isUnbinding
+                ) {
                     Text("Отмена")
                 }
             }
