@@ -105,6 +105,12 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          if [ -f test_output.log ]; then
+            echo "::error title=Unit Test Failure::$(tail -n 20 test_output.log | tr '\n' ' ')"
+          fi
+          if [ -f build_output.log ]; then
+            echo "::error title=Build Failure::$(tail -n 20 build_output.log | tr '\n' ' ')"
+          fi
           cp test_output.log /tmp/test_output.log 2>/dev/null || true
           cp build_output.log /tmp/build_output.log 2>/dev/null || true
           git config user.name "github-actions[bot]"

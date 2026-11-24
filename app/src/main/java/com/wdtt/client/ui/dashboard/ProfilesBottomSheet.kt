@@ -23,9 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.ConnectionProfile
+import com.wdtt.client.ProfileUnbindHelper
 import com.wdtt.client.ProfilesStore
 import com.wdtt.client.SettingsStore
-import com.wdtt.client.profiles.ProfileUnbindHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -453,7 +453,8 @@ fun ProfilesBottomSheet(
                     onClick = {
                         scope.launch {
                             isUnbinding = true
-                            val res = ProfileUnbindHelper.unbindProfile(context, target, unbindAllDevices = true)
+                            val subUrl = subscriptions.find { it.groupId == target.groupId }?.url
+                            val res = ProfileUnbindHelper.unbindProfile(context, target, subscriptionUrl = subUrl)
                             isUnbinding = false
                             unbindTargetProfile = null
                             if (res.isSuccess) {
