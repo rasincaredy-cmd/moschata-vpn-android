@@ -28,14 +28,17 @@ data class ConnectionProfile(
     val useGlobalHashes: Boolean = vkHashes.isBlank(),
     /** Ключ диагностики сервера (dk= из ссылки бота), пусто — нет. */
     val diagKey: String = "",
-    /** Тип протокола подключения: "qwdtt" (по умолчанию) или "yandex_docs". */
+    /** Тип протокола подключения: "qwdtt" (по умолчанию), "yandex_docs" или "wireguard". */
     val protocolType: String = PROTOCOL_QWDTT,
     /** Тип устройства: "phone" (по умолчанию) или "pc". */
-    val deviceType: String = DEVICE_PHONE
+    val deviceType: String = DEVICE_PHONE,
+    /** Полный текст конфигурации WireGuard для прямого подключения (при protocolType == "wireguard"). */
+    val wireguardConfig: String = ""
 ) {
     companion object {
         const val PROTOCOL_QWDTT = "qwdtt"
         const val PROTOCOL_YANDEX_DOCS = "yandex_docs"
+        const val PROTOCOL_WIREGUARD = "wireguard"
 
         const val DEVICE_PHONE = "phone"
         const val DEVICE_PC = "pc"
@@ -43,6 +46,9 @@ data class ConnectionProfile(
 
     val isYandexDocs: Boolean
         get() = protocolType == PROTOCOL_YANDEX_DOCS
+
+    val isWireGuard: Boolean
+        get() = protocolType == PROTOCOL_WIREGUARD
 
     val isPcDevice: Boolean
         get() = deviceType == DEVICE_PC
@@ -87,6 +93,7 @@ class ProfilesStore(context: Context) {
         private fun diagKeyKey(id: String) = stringPreferencesKey("profile_diag_key_enc_$id")
         private fun protocolTypeKey(id: String) = stringPreferencesKey("profile_protocol_type_$id")
         private fun deviceTypeKey(id: String) = stringPreferencesKey("profile_device_type_$id")
+        private fun wireguardConfigKey(id: String) = stringPreferencesKey("profile_wireguard_config_$id")
 
         private const val GROUPS_IDS_KEY = "groups_ids"
         private fun groupsIdsKey() = stringPreferencesKey(GROUPS_IDS_KEY)
@@ -129,7 +136,8 @@ class ProfilesStore(context: Context) {
                 val diagKey = secureStore.decrypt(prefs[diagKeyKey(id)] ?: "") ?: ""
                 val protocolType = prefs[protocolTypeKey(id)] ?: ConnectionProfile.PROTOCOL_QWDTT
                 val deviceType = prefs[deviceTypeKey(id)] ?: ConnectionProfile.DEVICE_PHONE
-                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType))
+                val wireguardConfig = prefs[wireguardConfigKey(id)] ?: ""
+                list.add(ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType, wireguardConfig))
             }
             list
         }
@@ -366,6 +374,7 @@ class ProfilesStore(context: Context) {
             prefs[useGlobalHashesKey(profile.id)] = profile.useGlobalHashes
             prefs[protocolTypeKey(profile.id)] = profile.protocolType
             prefs[deviceTypeKey(profile.id)] = profile.deviceType
+            prefs[wireguardConfigKey(profile.id)] = profile.wireguardConfig
             if (profile.diagKey.isBlank()) {
                 prefs.remove(diagKeyKey(profile.id))
             } else {
@@ -402,6 +411,7 @@ class ProfilesStore(context: Context) {
             prefs.remove(diagKeyKey(id))
             prefs.remove(protocolTypeKey(id))
             prefs.remove(deviceTypeKey(id))
+            prefs.remove(wireguardConfigKey(id))
         }
     }
 
@@ -480,7 +490,8 @@ class ProfilesStore(context: Context) {
         val diagKey = secureStore.decrypt(prefs[diagKeyKey(id)] ?: "") ?: ""
         val protocolType = prefs[protocolTypeKey(id)] ?: ConnectionProfile.PROTOCOL_QWDTT
         val deviceType = prefs[deviceTypeKey(id)] ?: ConnectionProfile.DEVICE_PHONE
-        return ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType)
+        val wireguardConfig = prefs[wireguardConfigKey(id)] ?: ""
+        return ConnectionProfile(id, name, peer, hashes, workers, port, pass, traffic, groupId, useGlobal, diagKey, protocolType, deviceType, wireguardConfig)
     }
 
     suspend fun incrementProfileTraffic(id: String, additionalTrafficMb: Double) = withContext(Dispatchers.IO) {
@@ -525,6 +536,8 @@ class ProfilesStore(context: Context) {
         settings.save(peerWithPort, finalHashes, "", p.workersPerHash, "udp", p.listenPort)
         settings.saveConnectionPassword(p.password)
         settings.saveDiagKey(p.diagKey)
+        settings.saveActiveProtocolType(p.protocolType)
+        settings.saveWireguardConfig(p.wireguardConfig)
         settings.saveCurrentProfile(p.id, p.name)
     }
 }

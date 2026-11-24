@@ -91,20 +91,30 @@ object SubscriptionImport {
                 updatedAt = root.optString("updatedAt", root.optString("updated", ""))
                 version = root.optInt("version", 0)
 
-                val array = root.optJSONArray("profiles") ?: root.optJSONArray("servers")
-                if (array != null) {
-                    val profiles = parseProfileArray(array, suggestedName)
-                    if (profiles.isNotEmpty()) {
-                        return ParsedRemoteSubscription(
-                            profiles = profiles,
-                            subscriptionName = suggestedName,
-                            description = description,
-                            trafficUsedMb = trafficUsed,
-                            trafficLimitMb = trafficLimit,
-                            updatedAt = updatedAt,
-                            version = version
-                        )
-                    }
+                val combinedProfiles = mutableListOf<ConnectionProfile>()
+
+                // 1. Парсим обычные WireGuard серверы из массива "servers"
+                val serversArray = root.optJSONArray("servers")
+                if (serversArray != null) {
+                    combinedProfiles.addAll(parseServerArray(serversArray))
+                }
+
+                // 2. Парсим профили обхода БС и Яндекс.Документов из массива "profiles"
+                val profilesArray = root.optJSONArray("profiles")
+                if (profilesArray != null) {
+                    combinedProfiles.addAll(parseProfileArray(profilesArray, suggestedName))
+                }
+
+                if (combinedProfiles.isNotEmpty()) {
+                    return ParsedRemoteSubscription(
+                        profiles = combinedProfiles,
+                        subscriptionName = suggestedName,
+                        description = description,
+                        trafficUsedMb = trafficUsed,
+                        trafficLimitMb = trafficLimit,
+                        updatedAt = updatedAt,
+                        version = version
+                    )
                 }
             } catch (_: Exception) {
             }
@@ -137,11 +147,70 @@ object SubscriptionImport {
         return null
     }
 
+    private fun parseServerArray(array: JSONArray): List<ConnectionProfile> {
+        val list = mutableListOf<ConnectionProfile>()
+        for (i in 0 until array.length()) {
+            val jsonObj = array.optJSONObject(i) ?: continue
+            parseServerObject(jsonObj)?.let { list.add(it) }
+        }
+        return list
+    }
+
+    private fun parseServerObject(jsonObj: JSONObject): ConnectionProfile? {
+        val name = jsonObj.optString("name", "").trim()
+        val config = jsonObj.optString("config", "").trim()
+        if (config.isBlank()) {
+            return parseProfileObject(jsonObj)
+        }
+
+        var endpoint = ""
+        for (line in config.lineSequence()) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Endpoint", ignoreCase = true) && trimmed.contains("=")) {
+                endpoint = trimmed.substringAfter("=").trim()
+                break
+            }
+        }
+        if (endpoint.isBlank()) endpoint = "48.102.173.96:585"
+
+        val serverName = when {
+            name.isNotBlank() && !name.contains("WireGuard", ignoreCase = true) && !name.contains("VPN", ignoreCase = true) -> "$name (WireGuard)"
+            name.isNotBlank() -> name
+            else -> "🇳🇱 Нидерланды (WireGuard)"
+        }
+
+        val rawDevice = jsonObj.optString("device", jsonObj.optString("deviceType", "")).trim().lowercase()
+        val isPc = rawDevice == "pc" || rawDevice == "windows" || rawDevice == "desktop" ||
+            serverName.contains("комп", ignoreCase = true) ||
+            serverName.contains("пк", ignoreCase = true) ||
+            serverName.contains("pc", ignoreCase = true) ||
+            serverName.contains("ноутбук", ignoreCase = true)
+        val deviceType = if (isPc) ConnectionProfile.DEVICE_PC else ConnectionProfile.DEVICE_PHONE
+
+        return ConnectionProfile(
+            id = UUID.randomUUID().toString(),
+            name = serverName,
+            peer = endpoint,
+            vkHashes = "",
+            workersPerHash = 0,
+            listenPort = 0,
+            password = "",
+            trafficMb = 0.0,
+            groupId = "",
+            useGlobalHashes = false,
+            diagKey = "",
+            protocolType = ConnectionProfile.PROTOCOL_WIREGUARD,
+            deviceType = deviceType,
+            wireguardConfig = config
+        )
+    }
+
     private fun parseProfileArray(array: JSONArray, fallbackGroupName: String?): List<ConnectionProfile> {
         val list = mutableListOf<ConnectionProfile>()
         for (i in 0 until array.length()) {
             val jsonObj = array.optJSONObject(i) ?: continue
-            parseProfileObject(jsonObj)?.let { list.add(it) }
+            val prof = if (jsonObj.has("config")) parseServerObject(jsonObj) else parseProfileObject(jsonObj)
+            prof?.let { list.add(it) }
         }
         return list
     }

@@ -9,6 +9,64 @@ import org.junit.Test
 class SubscriptionImportTest {
 
     @Test
+    fun testProductionFeedWithServersAndProfilesCombined() {
+        val json = """
+            {
+                "subscriptionName": "Moschata VPN Влад",
+                "servers": [
+                    {
+                        "name": "Нидерланды (Телефон)",
+                        "config": "[Interface]\nPrivateKey = aaaa\nAddress = 10.8.0.2/32\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = bbbb\nEndpoint = 48.102.173.96:585\nAllowedIPs = 0.0.0.0/0\n"
+                    }
+                ],
+                "profiles": [
+                    {
+                        "name": "⚡ Нидерланды Резервное подключение (Телефон)",
+                        "peer": "48.102.173.96:56000",
+                        "hashes": "vk_hash_test",
+                        "password": "pass_phone",
+                        "device": "phone"
+                    },
+                    {
+                        "name": "⚡ Нидерланды Резервное подключение (Комп)",
+                        "peer": "48.102.173.96:56000",
+                        "hashes": "vk_hash_test",
+                        "password": "pass_pc",
+                        "device": "pc"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = SubscriptionImport.parsePayload(json)
+        assertNotNull(parsed)
+        assertEquals(3, parsed!!.profiles.size)
+
+        // 1-й сервер: WireGuard обычный скоростной VPN
+        val wgServer = parsed.profiles[0]
+        assertTrue(wgServer.name.contains("Нидерланды"))
+        assertTrue(wgServer.name.contains("WireGuard"))
+        assertEquals("48.102.173.96:585", wgServer.peer)
+        assertEquals(ConnectionProfile.PROTOCOL_WIREGUARD, wgServer.protocolType)
+        assertTrue(wgServer.isWireGuard)
+        assertFalse(wgServer.isYandexDocs)
+        assertTrue(wgServer.wireguardConfig.contains("Endpoint = 48.102.173.96:585"))
+
+        // 2-й сервер: Обход БС (Телефон)
+        val bypassPhone = parsed.profiles[1]
+        assertTrue(bypassPhone.name.contains("Телефон"))
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, bypassPhone.protocolType)
+        assertEquals(ConnectionProfile.DEVICE_PHONE, bypassPhone.deviceType)
+        assertEquals("48.102.173.96:56000", bypassPhone.peer)
+
+        // 3-й сервер: Обход БС (Комп)
+        val bypassPc = parsed.profiles[2]
+        assertTrue(bypassPc.name.contains("Комп"))
+        assertEquals(ConnectionProfile.PROTOCOL_QWDTT, bypassPc.protocolType)
+        assertEquals(ConnectionProfile.DEVICE_PC, bypassPc.deviceType)
+    }
+
+    @Test
     fun testStandardProfilesParsing_mainVpnUnchanged() {
         val json = """
             {

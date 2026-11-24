@@ -162,8 +162,9 @@ fun ProfilesBottomSheet(
                 ) {
                     items(sortedProfiles, key = { it.id }) { profile ->
                         val isSelected = profile.id == currentProfileId
-                        val isBypass = profile.vkHashes.isNotBlank() || profile.peer.contains(":5600")
+                        val isWg = profile.isWireGuard || profile.protocolType == ConnectionProfile.PROTOCOL_WIREGUARD
                         val isYd = profile.isYandexDocs || profile.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
+                        val isBypass = (profile.vkHashes.isNotBlank() || profile.peer.contains(":5600")) && !isYd && !isWg
                         val isPc = profile.isPcDevice
 
                         Surface(
@@ -206,6 +207,7 @@ fun ProfilesBottomSheet(
                                     Text(
                                         text = when {
                                             isYd -> "📄"
+                                            isWg -> "🇳🇱"
                                             isPc -> "💻"
                                             profile.name.contains("Нидерланд", ignoreCase = true) || profile.peer.contains("48.102") || profile.peer.contains("13.143") -> "🇳🇱"
                                             else -> "🌐"
@@ -251,12 +253,24 @@ fun ProfilesBottomSheet(
                                             } else {
                                                 Surface(
                                                     shape = RoundedCornerShape(6.dp),
-                                                    color = if (isBypass) Color(0xFF7C4DFF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    color = when {
+                                                        isWg -> Color(0xFF00E676).copy(alpha = 0.2f)
+                                                        isBypass -> Color(0xFF7C4DFF).copy(alpha = 0.2f)
+                                                        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    }
                                                 ) {
                                                     Text(
-                                                        text = if (isBypass) "Обход БС ⚡" else "WireGuard",
+                                                        text = when {
+                                                            isWg -> "WireGuard 🛡️"
+                                                            isBypass -> "Обход БС ⚡"
+                                                            else -> "WireGuard"
+                                                        },
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        color = if (isBypass) Color(0xFF9D4EDD) else MaterialTheme.colorScheme.primary,
+                                                        color = when {
+                                                            isWg -> Color(0xFF00E676)
+                                                            isBypass -> Color(0xFF9D4EDD)
+                                                            else -> MaterialTheme.colorScheme.primary
+                                                        },
                                                         fontWeight = FontWeight.Bold,
                                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                                     )
@@ -334,9 +348,11 @@ fun ProfilesBottomSheet(
                     OutlinedTextField(
                         value = subscriptionUrlInput,
                         onValueChange = { subscriptionUrlInput = it },
-                        placeholder = { Text("https://.../subscription") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("https://.../sub/token") },
+                        maxLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 60.dp, max = 130.dp),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedButton(

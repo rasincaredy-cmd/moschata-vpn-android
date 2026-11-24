@@ -22,8 +22,8 @@ android {
         applicationId = "net.qwdtt.client"
         minSdk = 28
         targetSdk = 35
-        versionCode = 63
-        versionName = "1.6.6"
+        versionCode = 64
+        versionName = "1.6.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

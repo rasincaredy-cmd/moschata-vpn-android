@@ -385,6 +385,30 @@ object TunnelManager {
                         activeProfileId = ""
                     }
                 }
+
+                // Прямой скоростной WireGuard VPN (без обхода через VK TURN)
+                val activeProtocol = runCatching { SettingsStore(appContext).activeProtocolType.first() }.getOrDefault(ConnectionProfile.PROTOCOL_QWDTT)
+                val wireguardConf = runCatching { SettingsStore(appContext).wireguardConfig.first() }.getOrDefault("")
+                if (activeProtocol == ConnectionProfile.PROTOCOL_WIREGUARD && wireguardConf.isNotBlank()) {
+                    updateLog("conn_mode", "[СЕТЬ] Режим: Скоростной WireGuard (прямой туннель)", 1, false)
+                    setConnectionPipelineCurrent(ConnectionStep.VPN)
+                    try {
+                        wgHelper?.startTunnel(wireguardConf)
+                        config.value = wireguardConf
+                        markRunning(true)
+                        isConnecting.value = false
+                        stats.value = "Подключено (WireGuard)"
+                        markConnectionPipelineCompleted(ConnectionStep.VPN)
+                        finishConnectionPipeline()
+                        return@launch
+                    } catch (e: Exception) {
+                        failConnectionPipeline(ConnectionStep.VPN)
+                        updateLog("wg_error", "Ошибка запуска WireGuard: ${e.message}", 99, true)
+                        abortStart(isSwitching, "WireGuard: ${e.message}")
+                        return@launch
+                    }
+                }
+
                 val targetHash = if (activeHashIndex == 0) params.vkHashes else params.secondaryVkHash
                 
                 // Robust hash parsing: split by comma, newline, or whitespace

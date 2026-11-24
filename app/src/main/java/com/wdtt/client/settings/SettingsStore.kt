@@ -134,6 +134,8 @@ class SettingsStore(context: Context) {
         private val AUTO_START_ON_BOOT = booleanPreferencesKey("auto_start_on_boot")
         /** Экспериментально: Резервное подключение через Яндекс.Документы (OpenFlux / WSS docs.yandex.ru:443). */
         private val YANDEX_DOCS_ENABLED = booleanPreferencesKey("yandex_docs_enabled")
+        private val WIREGUARD_CONFIG = stringPreferencesKey("wireguard_config")
+        private val ACTIVE_PROTOCOL_TYPE = stringPreferencesKey("active_protocol_type")
         private val AUTO_SWITCH_TO_LOGS = booleanPreferencesKey("auto_switch_to_logs")
         private val STOP_ON_WIFI = booleanPreferencesKey("stop_on_wifi")
         /** Автоперерезолв доменов обхода и reload WG при смене IP. */
@@ -456,6 +458,8 @@ class SettingsStore(context: Context) {
     // ═══ Поведение ═══
     val autoStartOnBoot: Flow<Boolean> = dataStore.data.map { it[AUTO_START_ON_BOOT] ?: false }
     val yandexDocsEnabled: Flow<Boolean> = dataStore.data.map { it[YANDEX_DOCS_ENABLED] ?: false }
+    val wireguardConfig: Flow<String> = dataStore.data.map { it[WIREGUARD_CONFIG] ?: "" }
+    val activeProtocolType: Flow<String> = dataStore.data.map { it[ACTIVE_PROTOCOL_TYPE] ?: "qwdtt" }
     val autoSwitchToLogs: Flow<Boolean> = dataStore.data.map { it[AUTO_SWITCH_TO_LOGS] ?: true }
     val stopOnWifi: Flow<Boolean> = dataStore.data.map { it[STOP_ON_WIFI] ?: false }
     /** Периодический перерезолв доменов обхода. По умолчанию включён. */
@@ -573,6 +577,18 @@ class SettingsStore(context: Context) {
     suspend fun saveYandexDocsEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[YANDEX_DOCS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveWireguardConfig(config: String) {
+        dataStore.edit { prefs ->
+            prefs[WIREGUARD_CONFIG] = config
+        }
+    }
+
+    suspend fun saveActiveProtocolType(type: String) {
+        dataStore.edit { prefs ->
+            prefs[ACTIVE_PROTOCOL_TYPE] = type
         }
     }
 
