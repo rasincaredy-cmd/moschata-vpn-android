@@ -153,18 +153,19 @@ jobs:
           case "$GITHUB_REF_NAME" in
             *-alpha*|*-beta*|*-rc*) args+=(--prerelease) ;;
           esac
-          if ! gh release create "$GITHUB_REF_NAME" dist/* "${args[@]}" 2>&1 | tee publish_output.log; then
-            sleep 3
-            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-              gh release upload "$GITHUB_REF_NAME" dist/* --clobber 2>&1 | tee -a publish_output.log
-            else
-              fallback_args=(--title "Moschata VPN ${GITHUB_REF_NAME}" --notes "Moschata VPN ${GITHUB_REF_NAME}")
-              case "$GITHUB_REF_NAME" in
-                *-alpha*|*-beta*|*-rc*) fallback_args+=(--prerelease) ;;
-              esac
-              gh release create "$GITHUB_REF_NAME" dist/* "${fallback_args[@]}" 2>&1 | tee -a publish_output.log
-            fi
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" "${args[@]}" 2>&1 | tee publish_output.log || \
+              gh release create "$GITHUB_REF_NAME" --title "Moschata VPN ${GITHUB_REF_NAME}" --notes "Moschata VPN ${GITHUB_REF_NAME}" 2>&1 | tee -a publish_output.log
           fi
+          for f in dist/*; do
+            for attempt in 1 2 3; do
+              if gh release upload "$GITHUB_REF_NAME" "$f" --clobber 2>&1 | tee -a publish_output.log; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then exit 1; fi
+              sleep 5
+            done
+          done
 
       - name: Capture build log on failure
         if: failure()
