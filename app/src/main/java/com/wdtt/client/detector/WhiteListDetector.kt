@@ -65,7 +65,7 @@ class WhiteListDetector(
             "https://en.wikipedia.org/favicon.ico",
             "https://stackoverflow.com/favicon.ico",
             "https://python.org/favicon.ico",
-            "https://telegram.org/favicon.ico",
+            "https://www.mozilla.org/favicon.ico",
             "https://2ip.io/favicon.ico"
         )
 
@@ -118,7 +118,7 @@ class WhiteListDetector(
                 host.contains("wikipedia") -> "Wikipedia"
                 host.contains("stackoverflow") -> "Stack Overflow"
                 host.contains("python") -> "Python.org"
-                host.contains("telegram") -> "Telegram"
+                host.contains("mozilla") -> "Mozilla"
                 host.contains("2ip") -> "2IP"
                 else -> host
             }

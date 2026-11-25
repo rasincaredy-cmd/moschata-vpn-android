@@ -37,7 +37,7 @@ class WhiteListCatalogTest {
         assertEquals("Google", WhiteListDetector.resolveProbeTitle("https://www.google.com/generate_204"))
         assertEquals("Cloudflare 1.1.1.1", WhiteListDetector.resolveProbeTitle("https://1.1.1.1"))
         assertEquals("GitHub", WhiteListDetector.resolveProbeTitle("https://github.com/favicon.ico"))
-        assertEquals("Telegram", WhiteListDetector.resolveProbeTitle("https://telegram.org/favicon.ico"))
+        assertEquals("Mozilla", WhiteListDetector.resolveProbeTitle("https://www.mozilla.org/favicon.ico"))
         assertEquals("Wikipedia", WhiteListDetector.resolveProbeTitle("https://en.wikipedia.org/favicon.ico"))
     }
 
