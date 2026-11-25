@@ -109,30 +109,6 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleRelease -PtargetAbis=arm64-v8a,armeabi-v7a,x86_64 --no-daemon 2>&1 | tee build_output.log
 
-      - name: Capture build log on failure
-        if: failure()
-        shell: bash
-        run: |
-          if [ -f test_output.log ]; then
-            echo "::error title=Unit Test Failure::$(tail -n 20 test_output.log | tr '\n' ' ')"
-          fi
-          if [ -f build_output.log ]; then
-            echo "::error title=Build Failure::$(tail -n 20 build_output.log | tr '\n' ' ')"
-          fi
-          cp test_output.log /tmp/test_output.log 2>/dev/null || true
-          cp build_output.log /tmp/build_output.log 2>/dev/null || true
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-debug-log
-          git rm -rf . || true
-          echo "=== TEST OUTPUT ===" > ci_error.log
-          cat /tmp/test_output.log >> ci_error.log 2>/dev/null || true
-          echo "=== BUILD OUTPUT ===" >> ci_error.log
-          cat /tmp/build_output.log >> ci_error.log 2>/dev/null || true
-          git add ci_error.log
-          git commit -m "Capture build failure log" || true
-          git push -f origin ci-debug-log || true
-
       - name: Verify and name APKs
         shell: bash
         run: |
@@ -172,8 +148,50 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           args=(--title "Moschata VPN ${GITHUB_REF_NAME}" --generate-notes)
           case "$GITHUB_REF_NAME" in
             *-alpha*|*-beta*|*-rc*) args+=(--prerelease) ;;
           esac
-          gh release create "$GITHUB_REF_NAME" dist/* "${args[@]}"
+          if ! gh release create "$GITHUB_REF_NAME" dist/* "${args[@]}" 2>&1 | tee publish_output.log; then
+            sleep 3
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              gh release upload "$GITHUB_REF_NAME" dist/* --clobber 2>&1 | tee -a publish_output.log
+            else
+              fallback_args=(--title "Moschata VPN ${GITHUB_REF_NAME}" --notes "Moschata VPN ${GITHUB_REF_NAME}")
+              case "$GITHUB_REF_NAME" in
+                *-alpha*|*-beta*|*-rc*) fallback_args+=(--prerelease) ;;
+              esac
+              gh release create "$GITHUB_REF_NAME" dist/* "${fallback_args[@]}" 2>&1 | tee -a publish_output.log
+            fi
+          fi
+
+      - name: Capture build log on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f test_output.log ]; then
+            echo "::error title=Unit Test Failure::$(tail -n 20 test_output.log | tr '\n' ' ')"
+          fi
+          if [ -f build_output.log ]; then
+            echo "::error title=Build Failure::$(tail -n 20 build_output.log | tr '\n' ' ')"
+          fi
+          if [ -f publish_output.log ]; then
+            echo "::error title=Release Publish Failure::$(tail -n 20 publish_output.log | tr '\n' ' ')"
+          fi
+          cp test_output.log /tmp/test_output.log 2>/dev/null || true
+          cp build_output.log /tmp/build_output.log 2>/dev/null || true
+          cp publish_output.log /tmp/publish_output.log 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-debug-log
+          git rm -rf . || true
+          echo "=== TEST OUTPUT ===" > ci_error.log
+          cat /tmp/test_output.log >> ci_error.log 2>/dev/null || true
+          echo "=== BUILD OUTPUT ===" >> ci_error.log
+          cat /tmp/build_output.log >> ci_error.log 2>/dev/null || true
+          echo "=== PUBLISH OUTPUT ===" >> ci_error.log
+          cat /tmp/publish_output.log >> ci_error.log 2>/dev/null || true
+          git add ci_error.log
+          git commit -m "Capture build failure log" || true
+          git push -f origin ci-debug-log || true
