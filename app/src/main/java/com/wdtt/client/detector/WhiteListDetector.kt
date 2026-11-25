@@ -1,8 +1,16 @@
 package com.wdtt.client.detector
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import com.wdtt.client.ConnectionProfile
+import com.wdtt.client.SettingsStore
+import com.wdtt.client.TunnelManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import okhttp3.*
 import java.io.IOException
 import java.security.SecureRandom
@@ -25,7 +33,8 @@ data class DetectionReport(
     val externalProbes: List<ProbeResult>,
     val whitelistProbes: List<ProbeResult>,
     val durationMs: Long,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val viaVpn: Boolean = false
 )
 
 /**
@@ -281,6 +290,12 @@ class WhiteListDetector(
     }
 }
 
+data class BypassGateResult(
+    val allowed: Boolean,
+    val state: WhiteListDetector.NetworkState? = null,
+    val message: String? = null
+)
+
 /**
  * Глобальный синглтон-менеджер тестирования Белого Списка для Compose UI.
  */
@@ -294,23 +309,136 @@ object WhiteListDetectorManager {
     private val _isChecking = MutableStateFlow(false)
     val isChecking = _isChecking.asStateFlow()
 
-    fun runCheck() {
+    @Volatile
+    private var networkCallbackRegistered = false
+
+    @Volatile
+    private var lastObservedNetworkHandle: Long? = null
+
+    fun ensureNetworkTracked(context: Context) {
+        if (networkCallbackRegistered) return
+        synchronized(this) {
+            if (networkCallbackRegistered) return
+            val cm = runCatching {
+                context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            }.getOrNull() ?: return
+            lastObservedNetworkHandle = runCatching { cm.activeNetwork?.networkHandle }.getOrNull()
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    val handle = network.networkHandle
+                    val changed = lastObservedNetworkHandle != null && lastObservedNetworkHandle != handle
+                    lastObservedNetworkHandle = handle
+                    // Не сбрасываем статус оператора, если смена default network вызвана самим VPN-туннелем.
+                    if (changed && !TunnelManager.running.value && !TunnelManager.isConnecting.value) {
+                        val caps = runCatching { cm.getNetworkCapabilities(network) }.getOrNull()
+                        if (caps == null || !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                            _report.value = null
+                        }
+                    }
+                }
+
+                override fun onLost(network: Network) {
+                    if (!TunnelManager.running.value && !TunnelManager.isConnecting.value) {
+                        if (lastObservedNetworkHandle == network.networkHandle) {
+                            lastObservedNetworkHandle = null
+                            _report.value = null
+                        }
+                    }
+                }
+            }
+            if (runCatching { cm.registerDefaultNetworkCallback(callback) }.isSuccess) {
+                networkCallbackRegistered = true
+            }
+        }
+    }
+
+    fun isBypassBlockedByFreeInternet(currentReport: DetectionReport? = _report.value): Boolean {
+        return currentReport != null &&
+            !currentReport.viaVpn &&
+            currentReport.state == WhiteListDetector.NetworkState.FULL_INTERNET
+    }
+
+    fun invalidateIfStaleForSuspectedBypass() {
+        val current = _report.value
+        if (current != null && !current.viaVpn && current.state == WhiteListDetector.NetworkState.FULL_INTERNET) {
+            _report.value = null
+        }
+    }
+
+    fun runCheckIfUnchecked(context: Context) {
+        ensureNetworkTracked(context)
+        if (_report.value == null && !_isChecking.value && !TunnelManager.running.value && !TunnelManager.isConnecting.value) {
+            runCheck(viaVpn = false)
+        }
+    }
+
+    fun runCheck(viaVpn: Boolean = TunnelManager.running.value) {
         if (_isChecking.value) return
         scope.launch {
-            _isChecking.value = true
-            try {
-                val rep = detector.detectDetailed()
-                _report.value = rep
-            } catch (e: Exception) {
-                _report.value = DetectionReport(
-                    state = WhiteListDetector.NetworkState.NO_INTERNET,
-                    externalProbes = emptyList(),
-                    whitelistProbes = emptyList(),
-                    durationMs = 0L
-                )
-            } finally {
-                _isChecking.value = false
-            }
+            executeDetailedCheck(viaVpn)
+        }
+    }
+
+    /**
+     * Проверяет перед запуском «Обхода БС», разрешён ли он на текущей сети.
+     * Если свежий не-VPN тест уже показал свободный интернет — блокирует обход.
+     * Если теста ещё не было — выполняет быстрый замер текущей сети.
+     */
+    suspend fun verifyCanStartBypass(context: Context): BypassGateResult {
+        ensureNetworkTracked(context)
+        val existing = _report.value
+        if (existing != null && !existing.viaVpn) {
+            return evaluateGate(existing)
+        }
+        val fresh = executeDetailedCheck(viaVpn = false)
+        return evaluateGate(fresh)
+    }
+
+    suspend fun canStartSavedTunnel(context: Context): BypassGateResult {
+        val store = SettingsStore(context.applicationContext)
+        val activeProto = store.activeProtocolType.first()
+        val wgConfig = store.wireguardConfig.first()
+        if (activeProto == ConnectionProfile.PROTOCOL_WIREGUARD && wgConfig.isNotBlank()) {
+            return BypassGateResult(allowed = true)
+        }
+        if (activeProto == ConnectionProfile.PROTOCOL_YANDEX_DOCS) {
+            return BypassGateResult(
+                allowed = false,
+                message = "Режим Яндекс.Документы (OpenFlux) в разработке. Выберите Обычный VPN или Обход БС."
+            )
+        }
+        return verifyCanStartBypass(context)
+    }
+
+    internal fun evaluateGate(report: DetectionReport): BypassGateResult {
+        if (isBypassBlockedByFreeInternet(report)) {
+            return BypassGateResult(
+                allowed = false,
+                state = report.state,
+                message = "Интернет свободен — «Обход БС» отключён, чтобы не тратить лимиты звонков VK. Используйте Обычный VPN."
+            )
+        }
+        return BypassGateResult(allowed = true, state = report.state)
+    }
+
+    private suspend fun executeDetailedCheck(viaVpn: Boolean): DetectionReport {
+        _isChecking.value = true
+        return try {
+            val rep = detector.detectDetailed().copy(viaVpn = viaVpn)
+            _report.value = rep
+            rep
+        } catch (_: Exception) {
+            val fallback = DetectionReport(
+                state = WhiteListDetector.NetworkState.NO_INTERNET,
+                externalProbes = emptyList(),
+                whitelistProbes = emptyList(),
+                durationMs = 0L,
+                viaVpn = viaVpn
+            )
+            _report.value = fallback
+            fallback
+        } finally {
+            _isChecking.value = false
         }
     }
 }

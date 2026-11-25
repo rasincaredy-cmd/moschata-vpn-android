@@ -28,6 +28,7 @@ private const val GITHUB_RELEASE_TAG_URL_PREFIX = "https://github.com/rasincared
 private const val GITHUB_RELEASE_BY_TAG_URL_PREFIX = "https://api.github.com/repos/rasincaredy-cmd/moschata-vpn-android/releases/tags/"
 private const val GITHUB_TAGS_URL = "https://api.github.com/repos/rasincaredy-cmd/moschata-vpn-android/tags?per_page=100"
 private const val GITHUB_TAG_TREE_URL_PREFIX = "https://github.com/rasincaredy-cmd/moschata-vpn-android/tree/"
+private const val GITHUB_EXPANDED_ASSETS_URL_PREFIX = "https://github.com/rasincaredy-cmd/moschata-vpn-android/releases/expanded_assets/"
 private const val GITHUB_API_RATE_LIMIT_FALLBACK_MS = 30L * 60L * 1000L
 private val VERSION_NUMBER_REGEX = Regex("\\d+(?:\\.\\d+)*")
 
@@ -312,16 +313,49 @@ private fun enrichReleaseWithAssets(info: AppReleaseInfo): AppReleaseInfo? {
     val tag = normalizeVersionTag(info.versionTag).ifBlank { return null }
     val response = fetchGitHubApi("$GITHUB_RELEASE_BY_TAG_URL_PREFIX$tag")
         ?: fetchGitHubApi("$GITHUB_RELEASE_BY_TAG_URL_PREFIX${tag.removePrefix("v")}")
-        ?: return null
-    val json = try {
-        JSONObject(response)
-    } catch (e: Exception) {
-        Log.w(UPDATE_LOG_TAG, "[WARN] Update check: failed to enrich release assets for $tag", e)
-        return null
+    if (response != null) {
+        val json = runCatching { JSONObject(response) }.getOrNull()
+        val enriched = json?.toAppReleaseInfo()
+        if (enriched != null) {
+            return enriched.copy(
+                releaseUrl = info.releaseUrl.ifBlank { json.optString("html_url").trim() }
+            )
+        }
     }
-    return json.toAppReleaseInfo()?.copy(
-        releaseUrl = info.releaseUrl.ifBlank { json.optString("html_url").trim() }
-    )
+    // Если GitHub REST API упёрся в лимит 60 req/hr (HTTP 403), достаём APK-ссылку со страницы expanded_assets.
+    val webApkUrl = fetchApkUrlFromExpandedAssetsWeb(tag)
+        ?: fetchApkUrlFromExpandedAssetsWeb(tag.removePrefix("v"))
+        ?: return null
+    return info.copy(downloadUrl = webApkUrl)
+}
+
+private fun fetchApkUrlFromExpandedAssetsWeb(tag: String): String? {
+    val html = fetchHttpText(
+        url = "$GITHUB_EXPANDED_ASSETS_URL_PREFIX$tag",
+        sourceLabel = "GitHub Web Assets",
+        accept = "text/html,*/*",
+        isGitHubApi = false
+    ) ?: return null
+    return parseApkUrlFromExpandedAssetsHtml(html)
+}
+
+internal fun parseApkUrlFromExpandedAssetsHtml(html: String): String? {
+    val matches = Regex("""href="([^"]+/releases/download/[^"]+\.apk)"""", RegexOption.IGNORE_CASE)
+        .findAll(html)
+        .map { match ->
+            val path = match.groupValues[1]
+            if (path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true)) {
+                path
+            } else {
+                "https://github.com$path"
+            }
+        }
+        .distinct()
+        .toList()
+    if (matches.isEmpty()) return null
+    return matches.firstOrNull { it.contains("universal", ignoreCase = true) }
+        ?: matches.firstOrNull { it.contains("arm64", ignoreCase = true) }
+        ?: matches.first()
 }
 
 private fun pickApkAssetUrl(assets: JSONArray): String? {

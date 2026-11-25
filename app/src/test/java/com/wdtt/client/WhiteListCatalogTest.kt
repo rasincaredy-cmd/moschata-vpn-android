@@ -1,6 +1,8 @@
 package com.wdtt.client
 
+import com.wdtt.client.detector.DetectionReport
 import com.wdtt.client.detector.WhiteListDetector
+import com.wdtt.client.detector.WhiteListDetectorManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -44,5 +46,42 @@ class WhiteListCatalogTest {
         val allProbes = WhiteListDetector.DEFAULT_EXTERNAL_PROBES + WhiteListDetector.DEFAULT_WHITELIST_PROBES
         assertEquals(allProbes.size, allProbes.toSet().size)
         assertTrue(allProbes.all { it.startsWith("https://") })
+    }
+
+    @Test
+    fun testBypassGate_blocksWhenFreeInternetWithoutVpn() {
+        val freeOperatorReport = DetectionReport(
+            state = WhiteListDetector.NetworkState.FULL_INTERNET,
+            externalProbes = emptyList(),
+            whitelistProbes = emptyList(),
+            durationMs = 150L,
+            viaVpn = false
+        )
+        assertTrue(WhiteListDetectorManager.isBypassBlockedByFreeInternet(freeOperatorReport))
+        val gate = WhiteListDetectorManager.evaluateGate(freeOperatorReport)
+        assertFalse(gate.allowed)
+    }
+
+    @Test
+    fun testBypassGate_allowsWhenWhitelistActiveOrVpnReport() {
+        val whitelistReport = DetectionReport(
+            state = WhiteListDetector.NetworkState.WHITELIST_ONLY,
+            externalProbes = emptyList(),
+            whitelistProbes = emptyList(),
+            durationMs = 1500L,
+            viaVpn = false
+        )
+        assertFalse(WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport))
+        assertTrue(WhiteListDetectorManager.evaluateGate(whitelistReport).allowed)
+
+        val viaVpnReport = DetectionReport(
+            state = WhiteListDetector.NetworkState.FULL_INTERNET,
+            externalProbes = emptyList(),
+            whitelistProbes = emptyList(),
+            durationMs = 200L,
+            viaVpn = true
+        )
+        assertFalse(WhiteListDetectorManager.isBypassBlockedByFreeInternet(viaVpnReport))
+        assertTrue(WhiteListDetectorManager.evaluateGate(viaVpnReport).allowed)
     }
 }

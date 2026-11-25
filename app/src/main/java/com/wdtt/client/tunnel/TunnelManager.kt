@@ -1499,8 +1499,10 @@ object TunnelManager {
                     if (workers > 0) {
                         zeroWorkersSince = 0L
                         restartAttempts = 0
-                    } else if (processStartedAtMs > 0L && System.currentTimeMillis() - processStartedAtMs > 20_000) {
-                        lastFatalError.value = "Нет ответа от сервера AmneziaWG (${params.peer}) — попробуйте «Обход БС»"
+                    } else if (processStartedAtMs > 0L && System.currentTimeMillis() - processStartedAtMs > 22_000 && lastActiveAtMs == 0L) {
+                        com.wdtt.client.detector.WhiteListDetectorManager.invalidateIfStaleForSuspectedBypass()
+                        handleCriticalError("Нет ответа от сервера AmneziaWG (${params.peer}) — возможно активен Белый Список. Попробуйте «Обход БС».")
+                        return@launch
                     }
                 } else if (workers <= 0) {
                     if (zeroWorkersSince == 0L) {

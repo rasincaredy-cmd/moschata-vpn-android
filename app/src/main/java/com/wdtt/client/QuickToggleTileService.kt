@@ -32,20 +32,24 @@ class QuickToggleTileService : TileService() {
                 return
             }
 
-            val needsVpnPermission = runCatching {
-                VpnService.prepare(this@QuickToggleTileService) != null
-            }.getOrDefault(true)
-            if (!needsVpnPermission) {
-                TunnelControl.startFromSavedSettings(applicationContext)
-                updateTileConnecting()
-                return
-            }
-
             TunnelManager.scope.launch {
                 try {
+                    val gate = com.wdtt.client.detector.WhiteListDetectorManager.canStartSavedTunnel(applicationContext)
+                    if (!gate.allowed) {
+                        val msg = gate.message ?: "Интернет свободен — Обход БС отключён."
+                        TunnelManager.lastFatalError.value = msg
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@QuickToggleTileService, msg, Toast.LENGTH_LONG).show()
+                            updateTile(false)
+                        }
+                        return@launch
+                    }
+                    val needsVpnPermission = runCatching {
+                        VpnService.prepare(this@QuickToggleTileService) != null
+                    }.getOrDefault(true)
                     val mode = SettingsStore(applicationContext).connectionMode.first()
                     withContext(Dispatchers.Main) {
-                        if (mode == SettingsStore.CONNECTION_MODE_SOCKS) {
+                        if (!needsVpnPermission || mode == SettingsStore.CONNECTION_MODE_SOCKS) {
                             TunnelControl.startFromSavedSettings(applicationContext)
                             updateTileConnecting()
                         } else {

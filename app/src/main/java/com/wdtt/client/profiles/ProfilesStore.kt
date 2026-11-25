@@ -429,6 +429,9 @@ class ProfilesStore(context: Context) {
         toDelete.forEach { deleteProfile(it.id) }
         if (toDelete.any { it.id == currentId }) {
             settings.saveCurrentProfile("", "")
+            settings.save("", "", "", settings.workersPerHash.first(), "udp", settings.listenPort.first())
+            settings.saveConnectionPassword("")
+            settings.saveDiagKey("")
             settings.saveWireguardConfig("")
             settings.saveActiveProtocolType(ConnectionProfile.PROTOCOL_QWDTT)
         }
@@ -561,8 +564,9 @@ class ProfilesStore(context: Context) {
         val serverDtlsPort = if (manualPorts) settings.serverDtlsPort.first() else 56000
         val peerWithPort = if (p.isWireGuard || p.isYandexDocs) p.peer else PeerAddress.ensurePort(p.peer, serverDtlsPort)
         val preservedWorkers = settings.workersPerHash.first().takeIf { it > 0 } ?: p.workersPerHash.coerceAtLeast(9)
+        val preservedSecondaryHash = settings.secondaryVkHash.first()
         val effectiveListenPort = if (p.listenPort > 0) p.listenPort else settings.listenPort.first().takeIf { it > 0 } ?: 9000
-        settings.save(peerWithPort, finalHashes, "", preservedWorkers, "udp", effectiveListenPort)
+        settings.save(peerWithPort, finalHashes, preservedSecondaryHash, preservedWorkers, "udp", effectiveListenPort)
         settings.saveConnectionPassword(p.password)
         settings.saveDiagKey(p.diagKey)
         settings.saveActiveProtocolType(p.protocolType)

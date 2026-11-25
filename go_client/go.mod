@@ -3,6 +3,7 @@ module wg-turn-client
 go 1.26
 
 require (
+	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/bogdanfinn/fhttp v0.6.8
 	github.com/bogdanfinn/tls-client v1.15.1
@@ -15,7 +16,6 @@ require (
 	golang.org/x/crypto v0.54.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
-	github.com/amnezia-vpn/amneziawg-go/v3 v3.1.20261116
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	github.com/bogdanfinn/quic-go-utls v1.0.9-utls // indirect
 	github.com/bogdanfinn/utls v1.7.7-barnius // indirect
 	github.com/bogdanfinn/websocket v1.5.5-barnius // indirect
-	github.com/google/btree v1.1.2 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/stun/v3 v3.1.6 // indirect
@@ -34,4 +34,6 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
+	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+	gvisor.dev/gvisor v0.0.0-20231202080848-1f7806d17489 // indirect
 )

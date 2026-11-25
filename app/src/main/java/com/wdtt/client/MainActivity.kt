@@ -88,6 +88,19 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this@MainActivity, "Сначала добавьте подписку или выберите сервер", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
+                val existingReport = com.wdtt.client.detector.WhiteListDetectorManager.report.value
+                if (activeProto != ConnectionProfile.PROTOCOL_WIREGUARD &&
+                    (existingReport == null || existingReport.viaVpn)
+                ) {
+                    Toast.makeText(this@MainActivity, "Проверка сети на Белый Список…", Toast.LENGTH_SHORT).show()
+                }
+                val gate = com.wdtt.client.detector.WhiteListDetectorManager.canStartSavedTunnel(applicationContext)
+                if (!gate.allowed) {
+                    val msg = gate.message ?: "Интернет свободен — Обход БС отключён."
+                    TunnelManager.lastFatalError.value = msg
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                    return@launch
+                }
                 prepareVpnThen {
                     TunnelControl.startFromSavedSettings(applicationContext)
                 }

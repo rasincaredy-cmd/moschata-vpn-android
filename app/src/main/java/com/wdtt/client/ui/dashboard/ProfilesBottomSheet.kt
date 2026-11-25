@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +30,7 @@ import com.wdtt.client.ProfilesStore
 import com.wdtt.client.SettingsStore
 import com.wdtt.client.TunnelControl
 import com.wdtt.client.TunnelManager
+import com.wdtt.client.detector.WhiteListDetectorManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -48,6 +50,8 @@ fun ProfilesBottomSheet(
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
     val currentProfileId by settingsStore.currentProfileId.collectAsStateWithLifecycle(initialValue = "")
     val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val whitelistReport by WhiteListDetectorManager.report.collectAsStateWithLifecycle()
+    val isBypassBlocked = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport)
 
     var showAddDialog by remember { mutableStateOf(false) }
     var subscriptionUrlInput by remember { mutableStateOf("") }
@@ -57,12 +61,14 @@ fun ProfilesBottomSheet(
     var pcConfirmProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var deleteTargetSub by remember { mutableStateOf<ProfileSubscription?>(null) }
 
-    val sortedProfiles = remember(profiles) {
-        profiles.sortedWith(
-            compareBy<ConnectionProfile> { it.isPcDevice }
-                .thenBy { !it.isWireGuard }
-                .thenBy { it.name }
-        )
+    val sortedProfiles = remember(profiles, yandexDocsEnabled) {
+        profiles
+            .filter { yandexDocsEnabled || !it.isYandexDocs }
+            .sortedWith(
+                compareBy<ConnectionProfile> { it.isPcDevice }
+                    .thenBy { !it.isWireGuard }
+                    .thenBy { it.name }
+            )
     }
 
     fun selectProfile(target: ConnectionProfile) {
@@ -71,6 +77,15 @@ fun ProfilesBottomSheet(
             Toast.makeText(
                 context,
                 "Обход через Яндекс.Документы (OpenFlux) находится в разработке",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val isBypassProfile = !target.isWireGuard && !isYd
+        if (isBypassProfile && isBypassBlocked) {
+            Toast.makeText(
+                context,
+                "Интернет свободен — «Обход БС» отключён. Выберите Обычный VPN.",
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -251,6 +266,7 @@ fun ProfilesBottomSheet(
                         val isYd = profile.isYandexDocs || profile.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
                         val isBypass = (profile.vkHashes.isNotBlank() || profile.peer.contains(":5600")) && !isYd && !isWg
                         val isPc = profile.isPcDevice
+                        val bypassLocked = isBypass && isBypassBlocked
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -263,9 +279,10 @@ fun ProfilesBottomSheet(
                             ),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .alpha(if (bypassLocked) 0.55f else 1f)
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable {
-                                    if (isPc && !isSelected && !isYd) {
+                                    if (isPc && !isSelected && !isYd && !bypassLocked) {
                                         pcConfirmProfile = profile
                                     } else {
                                         selectProfile(profile)
@@ -427,10 +444,17 @@ fun ProfilesBottomSheet(
                         value = subscriptionUrlInput,
                         onValueChange = { subscriptionUrlInput = it },
                         placeholder = { Text("https://.../sub/token") },
-                        maxLines = 3,
+                        maxLines = 5,
+                        trailingIcon = {
+                            if (subscriptionUrlInput.isNotEmpty()) {
+                                IconButton(onClick = { subscriptionUrlInput = "" }) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Очистить")
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 60.dp, max = 130.dp),
+                            .heightIn(min = 60.dp, max = 160.dp),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedButton(

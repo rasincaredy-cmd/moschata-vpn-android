@@ -267,4 +267,12 @@ class SubscriptionImportTest {
         assertEquals(1, parsed!!.profiles.size)
         assertEquals("48.102.173.96:56000", parsed.profiles[0].peer)
     }
+
+    @Test
+    fun testExtractSubscriptionUrl_sanitizesWrappedText() {
+        assertEquals(
+            "https://48.102.173.96/sub/tok_123",
+            SubscriptionImport.extractSubscriptionUrl("  Ваша подписка: https://48.102.173.96/sub/tok_123, скопируйте.  ")
+        )
+    }
 }

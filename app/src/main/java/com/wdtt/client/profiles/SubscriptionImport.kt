@@ -20,9 +20,15 @@ data class ParsedRemoteSubscription(
 
 object SubscriptionImport {
 
+    internal fun extractSubscriptionUrl(rawInput: String): String {
+        val trimmed = rawInput.trim()
+        val match = Regex("""https?://[^\s<>"']+""", RegexOption.IGNORE_CASE).find(trimmed)
+        return match?.value?.trimEnd('.', ',', ';', ')') ?: trimmed
+    }
+
     suspend fun fetch(url: String): Result<ParsedRemoteSubscription> = withContext(Dispatchers.IO) {
         try {
-            val trimmed = url.trim()
+            val trimmed = extractSubscriptionUrl(url)
             if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) {
                 return@withContext Result.failure(IllegalArgumentException("Адрес подписки должен начинаться с http:// или https://"))
             }

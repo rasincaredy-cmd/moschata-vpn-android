@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wdtt.client.TunnelManager
 import com.wdtt.client.detector.DetectionReport
 import com.wdtt.client.detector.ProbeResult
 import com.wdtt.client.detector.WhiteListDetector
@@ -36,6 +37,7 @@ fun WhiteListTestCard(
 ) {
     val report by WhiteListDetectorManager.report.collectAsStateWithLifecycle()
     val isChecking by WhiteListDetectorManager.isChecking.collectAsStateWithLifecycle()
+    val tunnelRunning by TunnelManager.running.collectAsStateWithLifecycle()
 
     val cardColor = when (report?.state) {
         WhiteListDetector.NetworkState.FULL_INTERNET -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
@@ -105,6 +107,8 @@ fun WhiteListTestCard(
                         Text(
                             text = when {
                                 isChecking -> "Проверка доступности сети..."
+                                report?.viaVpn == true && report?.state == WhiteListDetector.NetworkState.FULL_INTERNET ->
+                                    "🟢 Интернет через VPN работает"
                                 report?.state == WhiteListDetector.NetworkState.FULL_INTERNET -> "🟢 Свободный интернет"
                                 report?.state == WhiteListDetector.NetworkState.WHITELIST_ONLY -> "🔴 Активен Белый Список!"
                                 report?.state == WhiteListDetector.NetworkState.NO_INTERNET -> "⚪ Связь отсутствует"
@@ -140,8 +144,10 @@ fun WhiteListTestCard(
             Text(
                 text = when {
                     isChecking -> "Тестирование 27 контрольных сервисов (РФ и мировых)..."
+                    report?.viaVpn == true ->
+                        "Замер выполнен через включённый VPN (${report!!.externalProbes.count { it.isSuccess }}/${report!!.externalProbes.size} внешних). Для проверки сети оператора отключите VPN и повторите тест."
                     report?.state == WhiteListDetector.NetworkState.FULL_INTERNET ->
-                        "Внешний интернет открыт (${report!!.externalProbes.count { it.isSuccess }}/${report!!.externalProbes.size} мировых сервисов). Режим обхода БС не требуется — используйте скоростной WireGuard."
+                        "Внешний интернет открыт (${report!!.externalProbes.count { it.isSuccess }}/${report!!.externalProbes.size} мировых сервисов). Режим «Обход БС» заблокирован — используйте Обычный VPN (AmneziaWG)."
                     report?.state == WhiteListDetector.NetworkState.WHITELIST_ONLY ->
                         "Оператор заблокировал внешний интернет! Доступны только ресурсы РФ (${report!!.whitelistProbes.count { it.isSuccess }}/${report!!.whitelistProbes.size}). Рекомендуется включить «Обход БС»."
                     report?.state == WhiteListDetector.NetworkState.NO_INTERNET ->
@@ -159,7 +165,7 @@ fun WhiteListTestCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { WhiteListDetectorManager.runCheck() },
+                    onClick = { WhiteListDetectorManager.runCheck(viaVpn = tunnelRunning) },
                     enabled = !isChecking,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)
@@ -179,7 +185,10 @@ fun WhiteListTestCard(
                     }
                 }
 
-                if (report?.state == WhiteListDetector.NetworkState.WHITELIST_ONLY && onSwitchToBypassMode != null) {
+                if (report?.viaVpn != true &&
+                    report?.state == WhiteListDetector.NetworkState.WHITELIST_ONLY &&
+                    onSwitchToBypassMode != null
+                ) {
                     FilledTonalButton(
                         onClick = onSwitchToBypassMode,
                         colors = ButtonDefaults.filledTonalButtonColors(

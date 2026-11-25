@@ -29,24 +29,30 @@ class TunnelWidgetProvider : AppWidgetProvider() {
             if (TunnelManager.running.value || TunnelManager.isConnecting.value) {
                 TunnelControl.stop(context)
             } else {
-                val needsVpnPermission = runCatching { VpnService.prepare(context) != null }
-                    .getOrDefault(true)
-                if (!needsVpnPermission) {
-                    TunnelControl.startFromSavedSettings(context)
-                    return
-                }
                 TunnelManager.scope.launch {
-                    val mode = SettingsStore(context.applicationContext).connectionMode.first()
+                    val appCtx = context.applicationContext
+                    val gate = com.wdtt.client.detector.WhiteListDetectorManager.canStartSavedTunnel(appCtx)
+                    if (!gate.allowed) {
+                        val msg = gate.message ?: "Интернет свободен — Обход БС отключён."
+                        TunnelManager.lastFatalError.value = msg
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(appCtx, msg, Toast.LENGTH_LONG).show()
+                        }
+                        return@launch
+                    }
+                    val needsVpnPermission = runCatching { VpnService.prepare(appCtx) != null }
+                        .getOrDefault(true)
+                    val mode = SettingsStore(appCtx).connectionMode.first()
                     withContext(Dispatchers.Main) {
-                        if (mode != SettingsStore.CONNECTION_MODE_SOCKS) {
+                        if (needsVpnPermission && mode != SettingsStore.CONNECTION_MODE_SOCKS) {
                             Toast.makeText(
-                                context.applicationContext,
+                                appCtx,
                                 "Разрешите Moschata VPN создать VPN-подключение",
                                 Toast.LENGTH_LONG,
                             ).show()
-                            openVpnPermissionActivity(context)
+                            openVpnPermissionActivity(appCtx)
                         } else {
-                            TunnelControl.startFromSavedSettings(context)
+                            TunnelControl.startFromSavedSettings(appCtx)
                         }
                     }
                 }

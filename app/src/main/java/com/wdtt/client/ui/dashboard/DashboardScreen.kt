@@ -75,6 +75,9 @@ fun DashboardScreen(
 
     val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
+    val whitelistReport by WhiteListDetectorManager.report.collectAsStateWithLifecycle()
+    val whitelistChecking by WhiteListDetectorManager.isChecking.collectAsStateWithLifecycle()
+    val isBypassBlockedByFreeInternet = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport)
 
     val activeProfile = remember(profiles, currentProfileId) { profiles.find { it.id == currentProfileId } }
 
@@ -126,6 +129,24 @@ fun DashboardScreen(
 
     // Таймер сессии
     var sessionSeconds by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        WhiteListDetectorManager.runCheckIfUnchecked(context)
+    }
+    LaunchedEffect(isBypassBlockedByFreeInternet, selectedMode, tunnelRunning, tunnelConnecting, wgProfiles) {
+        if (isBypassBlockedByFreeInternet &&
+            selectedMode == DashboardVpnMode.BYPASS &&
+            !tunnelRunning &&
+            !tunnelConnecting &&
+            wgProfiles.isNotEmpty()
+        ) {
+            profilesStore.applyProfile(context, wgProfiles.first().id)
+            Toast.makeText(
+                context,
+                "Интернет свободен — автоматически выбран Обычный VPN",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
     LaunchedEffect(tunnelRunning) {
         if (tunnelRunning) {
             val start = System.currentTimeMillis()
@@ -155,7 +176,7 @@ fun DashboardScreen(
     }
 
     fun switchMode(targetMode: DashboardVpnMode) {
-        if (targetMode == selectedMode && activeProfile != null) return
+        if (targetMode == selectedMode && activeProfile != null && !(targetMode == DashboardVpnMode.BYPASS && isBypassBlockedByFreeInternet)) return
         if (targetMode == DashboardVpnMode.YANDEX) {
             Toast.makeText(
                 context,
@@ -178,6 +199,29 @@ fun DashboardScreen(
         }
         val wasRunning = tunnelRunning || tunnelConnecting
         scope.launch {
+            if (targetMode == DashboardVpnMode.BYPASS) {
+                if (isBypassBlockedByFreeInternet) {
+                    Toast.makeText(
+                        context,
+                        "Интернет свободен — «Обход БС» отключён. Используйте Обычный VPN.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@launch
+                }
+                val rep = WhiteListDetectorManager.report.value
+                if (rep == null || rep.viaVpn) {
+                    Toast.makeText(context, "Проверка сети на Белый Список…", Toast.LENGTH_SHORT).show()
+                    val gate = WhiteListDetectorManager.verifyCanStartBypass(context)
+                    if (!gate.allowed) {
+                        Toast.makeText(
+                            context,
+                            gate.message ?: "Интернет свободен — «Обход БС» отключён.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@launch
+                    }
+                }
+            }
             if (wasRunning) {
                 TunnelControl.stop(context.applicationContext)
                 delay(450)
@@ -359,7 +403,7 @@ fun DashboardScreen(
             }
 
             // ═══ 1b. Встроенный баннер ошибки подключения ═══
-            AnimatedVisibility(visible = !tunnelRunning && lastFatalError != null && !dismissedError) {
+            AnimatedVisibility(visible = lastFatalError != null && !dismissedError) {
                 val errText = lastFatalError.orEmpty()
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -431,7 +475,7 @@ fun DashboardScreen(
                                     Text(if (unbindBusy) "Сброс..." else "Отвязать устройство", fontSize = 12.sp)
                                 }
                             }
-                            if (errText.contains("AmneziaWG", true) && bypassProfiles.isNotEmpty()) {
+                            if (errText.contains("AmneziaWG", true) && bypassProfiles.isNotEmpty() && !isBypassBlockedByFreeInternet) {
                                 Button(
                                     onClick = {
                                         dismissedError = true
@@ -441,6 +485,28 @@ fun DashboardScreen(
                                     modifier = Modifier.height(34.dp)
                                 ) {
                                     Text("Переключить на Обход БС", fontSize = 12.sp)
+                                }
+                            }
+                            if ((errText.contains("Обход БС", true) || errText.contains("свободен", true)) && wgProfiles.isNotEmpty()) {
+                                Button(
+                                    onClick = {
+                                        dismissedError = true
+                                        switchMode(DashboardVpnMode.REGULAR)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text("Обычный VPN", fontSize = 12.sp)
+                                }
+                            }
+                            if (errText.contains("Белый Список", true) || errText.contains("свободен", true)) {
+                                OutlinedButton(
+                                    onClick = { WhiteListDetectorManager.runCheck(viaVpn = false) },
+                                    enabled = !whitelistChecking,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text("Тест БС", fontSize = 12.sp)
                                 }
                             }
                             TextButton(
@@ -522,9 +588,13 @@ fun DashboardScreen(
                             modifier = Modifier.weight(1f),
                             emoji = "⚡",
                             title = "Обход БС",
-                            subtitle = if (bypassProfiles.isNotEmpty()) "VK TURN" else "Недоступен",
+                            subtitle = when {
+                                bypassProfiles.isEmpty() -> "Недоступен"
+                                isBypassBlockedByFreeInternet -> "Сеть свободна 🔒"
+                                else -> "VK TURN"
+                            },
                             selected = selectedMode == DashboardVpnMode.BYPASS,
-                            available = bypassProfiles.isNotEmpty(),
+                            available = bypassProfiles.isNotEmpty() && !isBypassBlockedByFreeInternet,
                             accentColor = Color(0xFF9D4EDD),
                             onClick = { switchMode(DashboardVpnMode.BYPASS) }
                         )
@@ -647,6 +717,35 @@ fun DashboardScreen(
                                     modifier = Modifier.padding(14.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
+                                    if (isBypassBlockedByFreeInternet) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = "🔒 Обход БС заблокирован: интернет свободен",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                TextButton(
+                                                    onClick = { WhiteListDetectorManager.runCheck(viaVpn = false) },
+                                                    enabled = !whitelistChecking,
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(28.dp)
+                                                ) {
+                                                    Text("Тест БС", fontSize = 11.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     // Сервер и кнопка отвязки
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),

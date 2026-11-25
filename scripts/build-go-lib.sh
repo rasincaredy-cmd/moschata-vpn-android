@@ -42,7 +42,19 @@ case "$ABI" in
     ;;
 esac
 
-if [[ -n "$NDK_DIR" && ! -d "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64" ]]; then
+detect_ndk_host_tag() {
+  local dir="$1"
+  local candidate
+  for candidate in linux-x86_64 windows-x86_64 darwin-arm64 darwin-x86_64; do
+    if [[ -d "$dir/toolchains/llvm/prebuilt/$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [[ -n "$NDK_DIR" ]] && ! detect_ndk_host_tag "$NDK_DIR" >/dev/null; then
   NDK_DIR=""
 fi
 
@@ -53,8 +65,13 @@ if [[ -z "$NDK_DIR" && -f "$ROOT_DIR/local.properties" ]]; then
   fi
 fi
 
-if [[ -z "$NDK_DIR" && -n "${ANDROID_SDK_ROOT:-}" ]]; then
-  NDK_DIR="$(find "$ANDROID_SDK_ROOT/ndk" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -V | tail -n1 || true)"
+if [[ -z "$NDK_DIR" ]]; then
+  for sdk_candidate in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}"; do
+    if [[ -n "$sdk_candidate" && -d "$sdk_candidate/ndk" ]]; then
+      NDK_DIR="$(find "$sdk_candidate/ndk" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort -V | tail -n1 || true)"
+      [[ -n "$NDK_DIR" ]] && break
+    fi
+  done
 fi
 
 if [[ -z "$NDK_DIR" ]]; then
@@ -62,10 +79,13 @@ if [[ -z "$NDK_DIR" ]]; then
   exit 1
 fi
 
-HOST_TAG="linux-x86_64"
+HOST_TAG="$(detect_ndk_host_tag "$NDK_DIR")"
 CC="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/${CLANG_PREFIX}${API_LEVEL}-clang"
+if [[ "$HOST_TAG" == windows-* && -f "${CC}.cmd" ]]; then
+  CC="${CC}.cmd"
+fi
 
-if [[ ! -x "$CC" ]]; then
+if [[ ! -f "$CC" && ! -x "$CC" ]]; then
   echo "Compiler not found: $CC" >&2
   exit 1
 fi
