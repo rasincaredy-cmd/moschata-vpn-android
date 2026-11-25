@@ -352,7 +352,11 @@ object WhiteListDetectorManager {
         }
     }
 
-    fun isBypassBlockedByFreeInternet(currentReport: DetectionReport? = _report.value): Boolean {
+    fun isBypassBlockedByFreeInternet(
+        currentReport: DetectionReport? = _report.value,
+        devAllowBypassOnFreeNet: Boolean = false
+    ): Boolean {
+        if (devAllowBypassOnFreeNet) return false
         return currentReport != null &&
             !currentReport.viaVpn &&
             currentReport.state == WhiteListDetector.NetworkState.FULL_INTERNET
@@ -386,12 +390,19 @@ object WhiteListDetectorManager {
      */
     suspend fun verifyCanStartBypass(context: Context): BypassGateResult {
         ensureNetworkTracked(context)
+        val store = SettingsStore(context.applicationContext)
+        val devOverride = runCatching {
+            store.developerModeEnabled.first() && store.devAllowBypassOnFreeNet.first()
+        }.getOrDefault(false)
+        if (devOverride) {
+            return BypassGateResult(allowed = true, state = _report.value?.state)
+        }
         val existing = _report.value
         if (existing != null && !existing.viaVpn) {
-            return evaluateGate(existing)
+            return evaluateGate(existing, devAllowBypassOnFreeNet = false)
         }
         val fresh = executeDetailedCheck(viaVpn = false)
-        return evaluateGate(fresh)
+        return evaluateGate(fresh, devAllowBypassOnFreeNet = false)
     }
 
     suspend fun canStartSavedTunnel(context: Context): BypassGateResult {
@@ -410,8 +421,11 @@ object WhiteListDetectorManager {
         return verifyCanStartBypass(context)
     }
 
-    internal fun evaluateGate(report: DetectionReport): BypassGateResult {
-        if (isBypassBlockedByFreeInternet(report)) {
+    internal fun evaluateGate(
+        report: DetectionReport,
+        devAllowBypassOnFreeNet: Boolean = false
+    ): BypassGateResult {
+        if (isBypassBlockedByFreeInternet(report, devAllowBypassOnFreeNet)) {
             return BypassGateResult(
                 allowed = false,
                 state = report.state,

@@ -134,6 +134,8 @@ class SettingsStore(context: Context) {
         private val AUTO_START_ON_BOOT = booleanPreferencesKey("auto_start_on_boot")
         /** Экспериментально: Резервное подключение через Яндекс.Документы (OpenFlux / WSS docs.yandex.ru:443). */
         private val YANDEX_DOCS_ENABLED = booleanPreferencesKey("yandex_docs_enabled")
+        private val DEVELOPER_MODE_ENABLED = booleanPreferencesKey("developer_mode_enabled")
+        private val DEV_ALLOW_BYPASS_ON_FREE_NET = booleanPreferencesKey("dev_allow_bypass_on_free_net")
         private val WIREGUARD_CONFIG = stringPreferencesKey("wireguard_config")
         private val ACTIVE_PROTOCOL_TYPE = stringPreferencesKey("active_protocol_type")
         private val AUTO_SWITCH_TO_LOGS = booleanPreferencesKey("auto_switch_to_logs")
@@ -458,6 +460,8 @@ class SettingsStore(context: Context) {
     // ═══ Поведение ═══
     val autoStartOnBoot: Flow<Boolean> = dataStore.data.map { it[AUTO_START_ON_BOOT] ?: false }
     val yandexDocsEnabled: Flow<Boolean> = dataStore.data.map { it[YANDEX_DOCS_ENABLED] ?: false }
+    val developerModeEnabled: Flow<Boolean> = dataStore.data.map { it[DEVELOPER_MODE_ENABLED] ?: false }
+    val devAllowBypassOnFreeNet: Flow<Boolean> = dataStore.data.map { it[DEV_ALLOW_BYPASS_ON_FREE_NET] ?: false }
     val wireguardConfig: Flow<String> = dataStore.data.map { it[WIREGUARD_CONFIG] ?: "" }
     val activeProtocolType: Flow<String> = dataStore.data.map { it[ACTIVE_PROTOCOL_TYPE] ?: "qwdtt" }
     val autoSwitchToLogs: Flow<Boolean> = dataStore.data.map { it[AUTO_SWITCH_TO_LOGS] ?: true }
@@ -577,6 +581,21 @@ class SettingsStore(context: Context) {
     suspend fun saveYandexDocsEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[YANDEX_DOCS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun saveDeveloperModeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[DEVELOPER_MODE_ENABLED] = enabled
+            if (!enabled) {
+                prefs[DEV_ALLOW_BYPASS_ON_FREE_NET] = false
+            }
+        }
+    }
+
+    suspend fun saveDevAllowBypassOnFreeNet(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[DEV_ALLOW_BYPASS_ON_FREE_NET] = enabled
         }
     }
 

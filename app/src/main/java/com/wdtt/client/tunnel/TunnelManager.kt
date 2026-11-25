@@ -1253,9 +1253,9 @@ object TunnelManager {
                                         stats.value = "RAW $ip"
                                     } catch (e: Exception) {
                                         failConnectionPipeline(ConnectionStep.RAW)
-                                        val msg = "Ошибка запуска raw-VPN: ${e.readableMessage()}"
+                                        val msg = "Ошибка запуска VPN-интерфейса: ${e.readableMessage()}"
                                         updateLog("rawtun_start_error", msg, 99, true)
-                                        lastFatalError.value = msg
+                                        handleCriticalError(msg)
                                     }
                                 }
                             }

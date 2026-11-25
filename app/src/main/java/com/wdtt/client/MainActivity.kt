@@ -89,7 +89,8 @@ class MainActivity : ComponentActivity() {
                     return@launch
                 }
                 val existingReport = com.wdtt.client.detector.WhiteListDetectorManager.report.value
-                if (activeProto != ConnectionProfile.PROTOCOL_WIREGUARD &&
+                val devOverride = store.developerModeEnabled.first() && store.devAllowBypassOnFreeNet.first()
+                if (!devOverride && activeProto != ConnectionProfile.PROTOCOL_WIREGUARD &&
                     (existingReport == null || existingReport.viaVpn)
                 ) {
                     Toast.makeText(this@MainActivity, "Проверка сети на Белый Список…", Toast.LENGTH_SHORT).show()

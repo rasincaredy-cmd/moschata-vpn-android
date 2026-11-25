@@ -49,6 +49,8 @@ fun SettingsSheet(
 
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
     val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val developerModeEnabled by settingsStore.developerModeEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val devAllowBypassOnFreeNet by settingsStore.devAllowBypassOnFreeNet.collectAsStateWithLifecycle(initialValue = false)
     val connectionMode by settingsStore.connectionMode.collectAsStateWithLifecycle(initialValue = SettingsStore.CONNECTION_MODE_VPN)
     val workersPerHash by settingsStore.workersPerHash.collectAsStateWithLifecycle(initialValue = 9)
     val vkHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
@@ -80,6 +82,8 @@ fun SettingsSheet(
     }
 
     var isCheckingUpdates by remember { mutableStateOf(false) }
+    var versionTapCount by remember { mutableIntStateOf(0) }
+    var lastVersionTapAtMs by remember { mutableLongStateOf(0L) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -601,6 +605,97 @@ fun SettingsSheet(
                         }
                     }
                 }
+            }
+
+            if (developerModeEnabled) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF9D4EDD).copy(alpha = 0.14f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🛠️ Режим разработчика",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFCE93D8)
+                            )
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        settingsStore.saveDeveloperModeEnabled(false)
+                                        Toast.makeText(context, "Режим разработчика выключен", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text("Выключить", fontSize = 12.sp)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Игнорировать запрет Обхода БС", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "Разрешить тестировать Обход БС даже при свободном интернете",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = devAllowBypassOnFreeNet,
+                                onCheckedChange = { checked ->
+                                    scope.launch { settingsStore.saveDevAllowBypassOnFreeNet(checked) }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        if (developerModeEnabled) {
+                            Toast.makeText(context, "Режим разработчика уже активен", Toast.LENGTH_SHORT).show()
+                            return@clickable
+                        }
+                        val now = System.currentTimeMillis()
+                        val nextCount = if (now - lastVersionTapAtMs <= 2_500L) versionTapCount + 1 else 1
+                        lastVersionTapAtMs = now
+                        versionTapCount = nextCount
+                        if (nextCount >= 7) {
+                            versionTapCount = 0
+                            scope.launch {
+                                settingsStore.saveDeveloperModeEnabled(true)
+                                Toast.makeText(context, "🛠️ Режим разработчика включён!", Toast.LENGTH_SHORT).show()
+                            }
+                        } else if (nextCount >= 4) {
+                            Toast.makeText(context, "Ещё ${7 - nextCount} нажатий до режима разработчика", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Moschata VPN • v${BuildConfig.VERSION_NAME} (сборка ${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
             }
         }
     }

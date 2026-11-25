@@ -34,11 +34,27 @@ func newAndroidFDDevice(file *os.File, mtu int) (*androidFDDevice, error) {
 	if file == nil {
 		return nil, errors.New("nil tun file")
 	}
-	if err := unix.SetNonblock(int(file.Fd()), true); err != nil {
+	// Клонируем fd и выставляем O_NONBLOCK ДО os.NewFile(), чтобы Go
+	// зарегистрировал дескриптор в epoll runtime poller вместо возврата EAGAIN
+	// при Read/Write и корректно будил Read при dev.Close().
+	rawFd := int(file.Fd())
+	dupFd, err := unix.Dup(rawFd)
+	if err != nil {
+		return nil, fmt.Errorf("dup tun fd: %w", err)
+	}
+	if err := unix.SetNonblock(dupFd, true); err != nil {
+		_ = unix.Close(dupFd)
 		return nil, fmt.Errorf("set nonblock tun fd: %w", err)
 	}
+	nbFile := os.NewFile(uintptr(dupFd), "tun")
+	if nbFile == nil {
+		_ = unix.Close(dupFd)
+		return nil, errors.New("os.NewFile returned nil for tun fd")
+	}
+	_ = file.Close()
+
 	d := &androidFDDevice{
-		file:   file,
+		file:   nbFile,
 		mtu:    mtu,
 		events: make(chan tun.Event, 4),
 	}

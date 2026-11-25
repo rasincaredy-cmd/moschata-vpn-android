@@ -60,6 +60,9 @@ class WhiteListCatalogTest {
         assertTrue(WhiteListDetectorManager.isBypassBlockedByFreeInternet(freeOperatorReport))
         val gate = WhiteListDetectorManager.evaluateGate(freeOperatorReport)
         assertFalse(gate.allowed)
+        // Developer mode override unlocks bypass for testing even on free internet
+        assertFalse(WhiteListDetectorManager.isBypassBlockedByFreeInternet(freeOperatorReport, devAllowBypassOnFreeNet = true))
+        assertTrue(WhiteListDetectorManager.evaluateGate(freeOperatorReport, devAllowBypassOnFreeNet = true).allowed)
     }
 
     @Test

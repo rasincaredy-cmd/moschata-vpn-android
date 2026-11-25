@@ -50,8 +50,11 @@ fun ProfilesBottomSheet(
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
     val currentProfileId by settingsStore.currentProfileId.collectAsStateWithLifecycle(initialValue = "")
     val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val developerModeEnabled by settingsStore.developerModeEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val devAllowBypassOnFreeNet by settingsStore.devAllowBypassOnFreeNet.collectAsStateWithLifecycle(initialValue = false)
+    val devOverrideFreeNet = developerModeEnabled && devAllowBypassOnFreeNet
     val whitelistReport by WhiteListDetectorManager.report.collectAsStateWithLifecycle()
-    val isBypassBlocked = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport)
+    val isBypassBlocked = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport, devOverrideFreeNet)
 
     var showAddDialog by remember { mutableStateOf(false) }
     var subscriptionUrlInput by remember { mutableStateOf("") }

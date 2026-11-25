@@ -75,9 +75,12 @@ fun DashboardScreen(
 
     val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
+    val developerModeEnabled by settingsStore.developerModeEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val devAllowBypassOnFreeNet by settingsStore.devAllowBypassOnFreeNet.collectAsStateWithLifecycle(initialValue = false)
+    val devOverrideFreeNet = developerModeEnabled && devAllowBypassOnFreeNet
     val whitelistReport by WhiteListDetectorManager.report.collectAsStateWithLifecycle()
     val whitelistChecking by WhiteListDetectorManager.isChecking.collectAsStateWithLifecycle()
-    val isBypassBlockedByFreeInternet = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport)
+    val isBypassBlockedByFreeInternet = WhiteListDetectorManager.isBypassBlockedByFreeInternet(whitelistReport, devOverrideFreeNet)
 
     val activeProfile = remember(profiles, currentProfileId) { profiles.find { it.id == currentProfileId } }
 
@@ -209,7 +212,7 @@ fun DashboardScreen(
                     return@launch
                 }
                 val rep = WhiteListDetectorManager.report.value
-                if (rep == null || rep.viaVpn) {
+                if (!devOverrideFreeNet && (rep == null || rep.viaVpn)) {
                     Toast.makeText(context, "Проверка сети на Белый Список…", Toast.LENGTH_SHORT).show()
                     val gate = WhiteListDetectorManager.verifyCanStartBypass(context)
                     if (!gate.allowed) {
@@ -591,6 +594,8 @@ fun DashboardScreen(
                             subtitle = when {
                                 bypassProfiles.isEmpty() -> "Недоступен"
                                 isBypassBlockedByFreeInternet -> "Сеть свободна 🔒"
+                                devOverrideFreeNet && whitelistReport?.viaVpn != true &&
+                                    whitelistReport?.state == com.wdtt.client.detector.WhiteListDetector.NetworkState.FULL_INTERNET -> "VK TURN (DEV)"
                                 else -> "VK TURN"
                             },
                             selected = selectedMode == DashboardVpnMode.BYPASS,
