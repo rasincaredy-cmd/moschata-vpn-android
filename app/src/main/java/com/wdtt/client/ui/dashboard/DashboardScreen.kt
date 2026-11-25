@@ -385,13 +385,23 @@ fun DashboardScreen(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
-                            if (tunnelStats.isNotBlank() && !tunnelStats.startsWith("Ожидание") && !tunnelStats.startsWith("Подключение")) {
+                            val speedBadge = remember(tunnelStats) {
+                                val afterFirst = tunnelStats.substringAfter("| ", "")
+                                val speedOnly = afterFirst.substringBefore(" |").trim()
+                                when {
+                                    speedOnly.startsWith("Скорость:", ignoreCase = true) ->
+                                        speedOnly.removePrefix("Скорость:").trim()
+                                    speedOnly.isNotBlank() -> speedOnly
+                                    else -> tunnelStats.substringBefore(" |").trim()
+                                }
+                            }
+                            if (speedBadge.isNotBlank() && !speedBadge.startsWith("Ожидание") && !speedBadge.startsWith("Подключение") && !speedBadge.startsWith("Активных")) {
                                 Surface(
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                                 ) {
                                     Text(
-                                        text = tunnelStats.substringAfter("| ").take(36),
+                                        text = speedBadge,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,

@@ -155,7 +155,16 @@ class MainActivity : ComponentActivity() {
         when (intent?.action) {
             AppShortcuts.ACTION_START_TUNNEL -> {
                 if (!TunnelManager.running.value && !TunnelManager.isConnecting.value) {
-                    prepareVpnThen { TunnelControl.startFromSavedSettings(applicationContext) }
+                    lifecycleScope.launch {
+                        val gate = com.wdtt.client.detector.WhiteListDetectorManager.canStartSavedTunnel(applicationContext)
+                        if (!gate.allowed) {
+                            val msg = gate.message ?: "Интернет свободен — Обход БС отключён."
+                            TunnelManager.lastFatalError.value = msg
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+                        prepareVpnThen { TunnelControl.startFromSavedSettings(applicationContext) }
+                    }
                 }
             }
             AppShortcuts.ACTION_STOP_TUNNEL -> TunnelControl.stop(applicationContext)
@@ -188,6 +197,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         checkAndRequestNotifications()
+        if (savedInstanceState == null) {
+            handleIncomingIntent(intent)
+        }
 
         val settingsStore = SettingsStore(this)
 
