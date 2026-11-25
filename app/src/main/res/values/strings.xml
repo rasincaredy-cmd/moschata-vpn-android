@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Moschata VPN</string>
-    <string name="shortcut_start_short">Подключить</string>
-    <string name="shortcut_start_long">Подключить Moschata VPN</string>
-    <string name="shortcut_stop_short">Отключить</string>
-    <string name="shortcut_stop_long">Отключить Moschata VPN</string>
-</resources>
