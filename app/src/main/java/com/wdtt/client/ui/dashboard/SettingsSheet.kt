@@ -34,7 +34,7 @@ import com.wdtt.client.fetchLatestReleaseInfo
 import com.wdtt.client.isNewerVersion
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsSheet(
     settingsStore: SettingsStore,
@@ -276,23 +276,24 @@ fun SettingsSheet(
                     // 1. Режим протокола обхода (Raw / WireGuard)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Режим протокола", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Row(
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             FilterChip(
                                 selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
                                 onClick = {
                                     scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_VPN) }
                                 },
-                                label = { Text("WireGuard (56000)") }
+                                label = { Text("WireGuard (56000)", maxLines = 1) }
                             )
                             FilterChip(
                                 selected = connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN,
                                 onClick = {
                                     scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_RAWTUN) }
                                 },
-                                label = { Text("Raw IP (56003)") }
+                                label = { Text("Raw IP (56003)", maxLines = 1) }
                             )
                         }
                         Text(
@@ -352,23 +353,24 @@ fun SettingsSheet(
                     // 3. Транспорт VK TURN (UDP / TCP)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("Транспорт VK TURN", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Row(
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             FilterChip(
                                 selected = turnTransport != SettingsStore.TURN_TRANSPORT_TCP,
                                 onClick = {
                                     scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_UDP) }
                                 },
-                                label = { Text("UDP (Быстрый)") }
+                                label = { Text("UDP (Быстрый)", maxLines = 1) }
                             )
                             FilterChip(
                                 selected = turnTransport == SettingsStore.TURN_TRANSPORT_TCP,
                                 onClick = {
                                     scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_TCP) }
                                 },
-                                label = { Text("TCP / 443 (Надёжный)") }
+                                label = { Text("TCP 443 (Надёжный)", maxLines = 1) }
                             )
                         }
                         Text(
@@ -644,7 +646,7 @@ fun SettingsSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text("Игнорировать запрет Обхода БС", style = MaterialTheme.typography.bodyMedium)
                                 Text(
                                     "Разрешить тестировать Обход БС даже при свободном интернете",

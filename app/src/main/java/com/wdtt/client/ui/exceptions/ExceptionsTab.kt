@@ -297,24 +297,70 @@ fun ExceptionsTab() {
             .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
+        if (bypassBusy || shareBusy) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .height(2.dp),
+                color = colors.primary,
+                trackColor = colors.surfaceVariant
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(top = 4.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                "Обход",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = (-0.2).sp
-                ),
-                color = colors.onSurface,
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.weight(1f)
-            )
+            ) {
+                SegmentedButton(
+                    selected = pane == ExceptionsPane.Routes,
+                    onClick = { pane = ExceptionsPane.Routes },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = colors.secondaryContainer,
+                        activeContentColor = colors.onSecondaryContainer,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = colors.onSurfaceVariant
+                    ),
+                    border = SegmentedButtonDefaults.borderStroke(colors.outlineVariant.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        "Сайты  ${bypassRules.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+                SegmentedButton(
+                    selected = pane == ExceptionsPane.Apps,
+                    onClick = { pane = ExceptionsPane.Apps },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                    colors = SegmentedButtonDefaults.colors(
+                        activeContainerColor = colors.secondaryContainer,
+                        activeContentColor = colors.onSecondaryContainer,
+                        inactiveContainerColor = Color.Transparent,
+                        inactiveContentColor = colors.onSurfaceVariant
+                    ),
+                    border = SegmentedButtonDefaults.borderStroke(colors.outlineVariant.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        "Приложения  ${selectedPackages.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+            }
             IconButton(
                 onClick = { showExportDialog = true },
-                enabled = !shareBusy && !bypassBusy
+                enabled = !shareBusy && !bypassBusy,
+                modifier = Modifier.size(38.dp)
             ) {
                 Icon(
                     Icons.Outlined.FileUpload,
@@ -324,66 +370,13 @@ fun ExceptionsTab() {
             }
             IconButton(
                 onClick = { importLauncher.launch("*/*") },
-                enabled = !shareBusy && !bypassBusy
+                enabled = !shareBusy && !bypassBusy,
+                modifier = Modifier.size(38.dp)
             ) {
                 Icon(
                     Icons.Outlined.FileDownload,
                     contentDescription = "Импорт",
                     tint = colors.onSurfaceVariant
-                )
-            }
-        }
-
-        if (bypassBusy || shareBusy) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp)
-                    .height(2.dp),
-                color = colors.primary,
-                trackColor = colors.surfaceVariant
-            )
-        }
-
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 14.dp)
-        ) {
-            SegmentedButton(
-                selected = pane == ExceptionsPane.Routes,
-                onClick = { pane = ExceptionsPane.Routes },
-                shape = SegmentedButtonDefaults.itemShape(0, 2),
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = colors.secondaryContainer,
-                    activeContentColor = colors.onSecondaryContainer,
-                    inactiveContainerColor = Color.Transparent,
-                    inactiveContentColor = colors.onSurfaceVariant
-                ),
-                border = SegmentedButtonDefaults.borderStroke(colors.outlineVariant.copy(alpha = 0.7f))
-            ) {
-                Text(
-                    "Сайты  ${bypassRules.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            SegmentedButton(
-                selected = pane == ExceptionsPane.Apps,
-                onClick = { pane = ExceptionsPane.Apps },
-                shape = SegmentedButtonDefaults.itemShape(1, 2),
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = colors.secondaryContainer,
-                    activeContentColor = colors.onSecondaryContainer,
-                    inactiveContainerColor = Color.Transparent,
-                    inactiveContentColor = colors.onSurfaceVariant
-                ),
-                border = SegmentedButtonDefaults.borderStroke(colors.outlineVariant.copy(alpha = 0.7f))
-            ) {
-                Text(
-                    "Приложения  ${selectedPackages.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -508,15 +501,15 @@ fun ExceptionsTab() {
                                 .padding(horizontal = 18.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
                                 Text(
-                                    "Режим",
+                                    "Режим для приложений",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    if (isWhitelist) "БС: только выбранные через VPN"
-                                    else "ЧС: выбранные мимо VPN",
+                                    if (isWhitelist) "Только выбранные приложения идут через VPN"
+                                    else "Выбранные приложения работают напрямую без VPN",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.onSurfaceVariant
                                 )
@@ -541,7 +534,7 @@ fun ExceptionsTab() {
                                         inactiveContainerColor = Color.Transparent,
                                         inactiveContentColor = colors.onSurfaceVariant
                                     )
-                                ) { Text("ЧС", style = MaterialTheme.typography.labelMedium) }
+                                ) { Text("Мимо VPN", style = MaterialTheme.typography.labelSmall, maxLines = 1) }
                                 SegmentedButton(
                                     selected = isWhitelist,
                                     onClick = {
@@ -561,7 +554,7 @@ fun ExceptionsTab() {
                                         inactiveContainerColor = Color.Transparent,
                                         inactiveContentColor = colors.onSurfaceVariant
                                     )
-                                ) { Text("БС", style = MaterialTheme.typography.labelMedium) }
+                                ) { Text("Только VPN", style = MaterialTheme.typography.labelSmall, maxLines = 1) }
                             }
                         }
 
@@ -670,7 +663,7 @@ fun ExceptionsTab() {
                     )
                     ScopeRadio(
                         label = "Только приложения",
-                        subtitle = "${selectedPackages.size} · ${if (isWhitelist) "БС" else "ЧС"}",
+                        subtitle = "${selectedPackages.size} · ${if (isWhitelist) "Только VPN" else "Мимо VPN"}",
                         selected = exportScope == BypassShare.Scope.Apps,
                         onClick = { exportScope = BypassShare.Scope.Apps }
                     )
@@ -714,7 +707,7 @@ fun ExceptionsTab() {
                                 if (peek.hasRoutes) append("${peek.routesCount} сайтов")
                                 if (peek.hasRoutes && peek.hasApps) append(" · ")
                                 if (peek.hasApps) {
-                                    append("${peek.appsCount} прилож. (${if (peek.isWhitelist) "БС" else "ЧС"})")
+                                    append("${peek.appsCount} прилож. (${if (peek.isWhitelist) "Только VPN" else "Мимо VPN"})")
                                 }
                                 if (peek.isPlainText) append(" · текстовый список")
                             },

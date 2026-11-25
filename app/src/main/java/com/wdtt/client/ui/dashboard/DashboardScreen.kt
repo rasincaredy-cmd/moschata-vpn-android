@@ -1,10 +1,10 @@
 package com.wdtt.client.ui.dashboard
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,7 +41,37 @@ private enum class DashboardVpnMode {
     YANDEX
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val LEADING_PROFILE_EMOJIS = setOf("⚡", "📄", "🛡", "🛡️", "🌐", "💻")
+
+internal fun cleanProfileDisplayName(name: String, fallback: String): String {
+    var result = name.trim()
+    while (result.isNotEmpty()) {
+        val prev = result
+        // Убираем ведущие маркеры режима (⚡, 📄, 🛡️, 💻, 🌐)
+        for (marker in LEADING_PROFILE_EMOJIS) {
+            if (result.startsWith(marker)) {
+                result = result.removePrefix(marker).trimStart()
+            }
+        }
+        // Убираем ведущие эмодзи-флаги (пара Regional Indicator Symbols: 2 суррогатные пары = 4 Char)
+        if (result.length >= 4 &&
+            Character.isHighSurrogate(result[0]) && Character.isLowSurrogate(result[1]) &&
+            Character.isHighSurrogate(result[2]) && Character.isLowSurrogate(result[3])
+        ) {
+            val cp1 = Character.codePointAt(result, 0)
+            val cp2 = Character.codePointAt(result, 2)
+            if (cp1 in 0x1F1E6..0x1F1FF && cp2 in 0x1F1E6..0x1F1FF) {
+                result = result.substring(4).trimStart()
+            }
+        }
+        // Убираем вариационные селекторы на всякий случай
+        result = result.trimStart('\uFE0F', ' ')
+        if (result == prev) break
+    }
+    return result.ifBlank { fallback }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DashboardScreen(
     settingsStore: SettingsStore,
@@ -124,16 +154,23 @@ fun DashboardScreen(
     var showProfilesSheet by rememberSaveable { mutableStateOf(false) }
     var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
     var showWhiteListDetails by rememberSaveable { mutableStateOf(false) }
+    var unbindTargetProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var unbindBusy by remember { mutableStateOf(false) }
     var dismissedError by remember(lastFatalError) { mutableStateOf(false) }
 
     // Полноэкранные вложенные просмотры
     var currentOverlayScreen by rememberSaveable { mutableStateOf<String?>(null) }
 
+    BackHandler(enabled = currentOverlayScreen != null) {
+        currentOverlayScreen = null
+    }
+
     // Таймер сессии
     var sessionSeconds by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(Unit) {
-        WhiteListDetectorManager.runCheckIfUnchecked(context)
+    LaunchedEffect(tunnelRunning, tunnelConnecting) {
+        if (!tunnelRunning && !tunnelConnecting) {
+            WhiteListDetectorManager.runCheckIfUnchecked(context)
+        }
     }
     LaunchedEffect(isBypassBlockedByFreeInternet, selectedMode, tunnelRunning, tunnelConnecting, wgProfiles) {
         if (isBypassBlockedByFreeInternet &&
@@ -603,7 +640,7 @@ fun DashboardScreen(
                             title = "Обход БС",
                             subtitle = when {
                                 bypassProfiles.isEmpty() -> "Недоступен"
-                                isBypassBlockedByFreeInternet -> "Сеть свободна 🔒"
+                                isBypassBlockedByFreeInternet -> "Свободна 🔒"
                                 devOverrideFreeNet && whitelistReport?.viaVpn != true &&
                                     whitelistReport?.state == com.wdtt.client.detector.WhiteListDetector.NetworkState.FULL_INTERNET -> "VK TURN (DEV)"
                                 else -> "VK TURN"
@@ -663,7 +700,10 @@ fun DashboardScreen(
                                             Text("🇳🇱", fontSize = 22.sp)
                                             Column {
                                                 Text(
-                                                    text = activeProfile?.name ?: currentProfileName.ifBlank { "Сервер AmneziaWG" },
+                                                    text = cleanProfileDisplayName(
+                                                        activeProfile?.name ?: currentProfileName,
+                                                        "Сервер AmneziaWG"
+                                                    ),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     maxLines = 1,
@@ -779,7 +819,10 @@ fun DashboardScreen(
                                             Text(if (activeProfile?.isPcDevice == true) "💻" else "⚡", fontSize = 20.sp)
                                             Column {
                                                 Text(
-                                                    text = activeProfile?.name ?: currentProfileName.ifBlank { "Профиль Обхода БС" },
+                                                    text = cleanProfileDisplayName(
+                                                        activeProfile?.name ?: currentProfileName,
+                                                        "Профиль Обхода БС"
+                                                    ),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     fontWeight = FontWeight.Bold,
                                                     maxLines = 1,
@@ -796,18 +839,7 @@ fun DashboardScreen(
                                         if (activeProfile != null && activeProfile.password.isNotBlank()) {
                                             IconButton(
                                                 onClick = {
-                                                    if (unbindBusy) return@IconButton
-                                                    scope.launch {
-                                                        unbindBusy = true
-                                                        val subUrl = subscriptions.find { it.groupId == activeProfile.groupId }?.url
-                                                        val res = ProfileUnbindHelper.unbindProfile(context, activeProfile, subscriptionUrl = subUrl)
-                                                        unbindBusy = false
-                                                        if (res.isSuccess) {
-                                                            Toast.makeText(context, "Устройство отвязано от сервера!", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            Toast.makeText(context, "Ошибка отвязки: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
-                                                        }
-                                                    }
+                                                    if (!unbindBusy) unbindTargetProfile = activeProfile
                                                 },
                                                 modifier = Modifier.size(34.dp)
                                             ) {
@@ -835,11 +867,10 @@ fun DashboardScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             val isManual = captchaMode == "wv" && captchaSolveMethod == "manual"
                                             val isRjs = captchaMode == "rjs"
@@ -872,7 +903,7 @@ fun DashboardScreen(
                                                         settingsStore.saveCaptchaMode("rjs")
                                                     }
                                                 },
-                                                label = { Text("Без браузера (Go)") }
+                                                label = { Text("Без окна (Go)") }
                                             )
                                         }
                                     }
@@ -897,11 +928,10 @@ fun DashboardScreen(
                                                 color = Color(0xFF9D4EDD)
                                             )
                                         }
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             workerOptions.forEach { count ->
                                                 FilterChip(
@@ -921,11 +951,10 @@ fun DashboardScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .horizontalScroll(rememberScrollState()),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             FilterChip(
                                                 selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
@@ -1004,6 +1033,47 @@ fun DashboardScreen(
             onDismiss = { showWhiteListDetails = false }
         )
     }
+
+    if (unbindTargetProfile != null) {
+        val target = unbindTargetProfile!!
+        AlertDialog(
+            onDismissRequest = { if (!unbindBusy) unbindTargetProfile = null },
+            title = { Text("Отвязать устройство?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Сбросить привязку устройства для профиля «${cleanProfileDisplayName(target.name, "Обход БС")}»?\n\n" +
+                    "Сервер очистит запомненный идентификатор устройства (Device ID)."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (unbindBusy) return@Button
+                        scope.launch {
+                            unbindBusy = true
+                            val subUrl = subscriptions.find { it.groupId == target.groupId }?.url
+                            val res = ProfileUnbindHelper.unbindProfile(context, target, subscriptionUrl = subUrl)
+                            unbindBusy = false
+                            unbindTargetProfile = null
+                            if (res.isSuccess) {
+                                Toast.makeText(context, "Устройство отвязано от сервера!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Ошибка отвязки: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    enabled = !unbindBusy
+                ) {
+                    Text(if (unbindBusy) "Сброс…" else "Отвязать")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { unbindTargetProfile = null }, enabled = !unbindBusy) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1036,21 +1106,22 @@ private fun ModeSelectorTile(
             .clickable(onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(emoji, fontSize = 20.sp)
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
+                fontSize = 12.5.sp,
+                letterSpacing = (-0.2).sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
+                fontSize = 11.sp,
                 color = if (selected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

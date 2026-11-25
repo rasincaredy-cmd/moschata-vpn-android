@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.ConnectionProfile
+import com.wdtt.client.PeerAddress
 import com.wdtt.client.ProfileSubscription
 import com.wdtt.client.ProfileUnbindHelper
 import com.wdtt.client.ProfilesStore
@@ -58,6 +59,8 @@ fun ProfilesBottomSheet(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var subscriptionUrlInput by remember { mutableStateOf("") }
+    var isAddingSub by remember { mutableStateOf(false) }
+    var addSubError by remember { mutableStateOf<String?>(null) }
     var isSyncing by remember { mutableStateOf(false) }
     var unbindTargetProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var isUnbinding by remember { mutableStateOf(false) }
@@ -72,6 +75,9 @@ fun ProfilesBottomSheet(
                     .thenBy { !it.isWireGuard }
                     .thenBy { it.name }
             )
+    }
+    val duplicateProfileNames = remember(sortedProfiles) {
+        sortedProfiles.groupingBy { it.name.trim() }.eachCount().filterValues { it > 1 }.keys
     }
 
     fun selectProfile(target: ConnectionProfile) {
@@ -315,10 +321,17 @@ fun ProfilesBottomSheet(
 
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Text(
-                                            text = profile.name.ifBlank { "Сервер ${profile.peer}" },
+                                            text = cleanProfileDisplayName(profile.name, "Сервер ${profile.peer}"),
                                             style = MaterialTheme.typography.bodyLarge,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         )
+                                        if (profile.name.trim() in duplicateProfileNames && profile.peer.isNotBlank()) {
+                                            Text(
+                                                text = "Узел: ${PeerAddress.host(profile.peer)}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -435,22 +448,35 @@ fun ProfilesBottomSheet(
 
     if (showAddDialog) {
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+            onDismissRequest = {
+                if (!isAddingSub) {
+                    showAddDialog = false
+                    addSubError = null
+                }
+            },
             title = { Text("Добавить подписку") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "Вставьте ссылку подписки из Telegram-бота @MoschataVPN_bot:",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     OutlinedTextField(
                         value = subscriptionUrlInput,
-                        onValueChange = { subscriptionUrlInput = it },
+                        onValueChange = {
+                            subscriptionUrlInput = it
+                            if (addSubError != null) addSubError = null
+                        },
                         placeholder = { Text("https://.../sub/token") },
+                        enabled = !isAddingSub,
+                        isError = addSubError != null,
                         maxLines = 5,
                         trailingIcon = {
-                            if (subscriptionUrlInput.isNotEmpty()) {
-                                IconButton(onClick = { subscriptionUrlInput = "" }) {
+                            if (subscriptionUrlInput.isNotEmpty() && !isAddingSub) {
+                                IconButton(onClick = {
+                                    subscriptionUrlInput = ""
+                                    addSubError = null
+                                }) {
                                     Icon(Icons.Filled.Close, contentDescription = "Очистить")
                                 }
                             }
@@ -460,12 +486,23 @@ fun ProfilesBottomSheet(
                             .heightIn(min = 60.dp, max = 160.dp),
                         shape = RoundedCornerShape(12.dp)
                     )
+                    if (addSubError != null) {
+                        Text(
+                            text = addSubError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     OutlinedButton(
                         onClick = {
                             val clip = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             val text = clip.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-                            if (text.isNotBlank()) subscriptionUrlInput = text.trim()
+                            if (text.isNotBlank()) {
+                                subscriptionUrlInput = text.trim()
+                                addSubError = null
+                            }
                         },
+                        enabled = !isAddingSub,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -476,26 +513,44 @@ fun ProfilesBottomSheet(
             },
             confirmButton = {
                 Button(
+                    enabled = !isAddingSub && subscriptionUrlInput.trim().isNotEmpty(),
                     onClick = {
                         val url = subscriptionUrlInput.trim()
-                        if (url.isNotEmpty()) {
+                        if (url.isNotEmpty() && !isAddingSub) {
                             scope.launch {
+                                isAddingSub = true
+                                addSubError = null
                                 val res = profilesStore.addSubscription(url)
+                                isAddingSub = false
                                 if (res.isSuccess) {
                                     Toast.makeText(context, "Подписка успешно подключена!", Toast.LENGTH_SHORT).show()
                                     showAddDialog = false
                                 } else {
-                                    Toast.makeText(context, "Ошибка: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                    addSubError = res.exceptionOrNull()?.message ?: "Не удалось загрузить подписку"
                                 }
                             }
                         }
                     }
                 ) {
-                    Text("Подключить")
+                    if (isAddingSub) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Подключить")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(
+                    enabled = !isAddingSub,
+                    onClick = {
+                        showAddDialog = false
+                        addSubError = null
+                    }
+                ) {
                     Text("Отмена")
                 }
             }
