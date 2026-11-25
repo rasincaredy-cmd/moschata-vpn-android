@@ -80,6 +80,9 @@ class TunnelService : Service() {
                     try {
                         val store = SettingsStore(appContext)
                         SettingsStore.awaitMigrations(appContext)
+                        val activeProtocolType = store.activeProtocolType.first()
+                        val wireguardConfig = store.wireguardConfig.first()
+                        val isDirectAwg = activeProtocolType == ConnectionProfile.PROTOCOL_WIREGUARD && wireguardConfig.isNotBlank()
                         val basePeer = intent.getStringExtra("peer")?.takeIf { it.isNotEmpty() } ?: store.peer.first()
                         val manualPortsEnabled = store.manualPortsEnabled.first()
                         val connectionMode = SettingsStore.normalizeConnectionMode(
@@ -100,9 +103,12 @@ class TunnelService : Service() {
                             noDtlsEnabled -> serverDirectPort
                             else -> serverDtlsPort
                         }
-                        val peerWithPort = if (basePeer.isBlank()) basePeer
-                            else if (isRawTun || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003)) PeerAddress.withPort(basePeer, effectiveServerPort)
-                            else PeerAddress.ensurePort(basePeer, effectiveServerPort)
+                        val peerWithPort = when {
+                            basePeer.isBlank() || isDirectAwg -> basePeer
+                            isRawTun || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003) ->
+                                PeerAddress.withPort(basePeer, effectiveServerPort)
+                            else -> PeerAddress.ensurePort(basePeer, effectiveServerPort)
+                        }
                         val vkAnonPath = SettingsStore.normalizeVkAnonPath(
                             intent.getStringExtra("vk_anon_path")?.takeIf { it.isNotEmpty() }
                                 ?: store.vkAnonPath.first()
@@ -152,7 +158,9 @@ class TunnelService : Service() {
                             turnHosts = store.turnHosts.first(),
                             detailedLogs = store.detailedLogs.first(),
                             diagKey = store.diagKey.first(),
-                            diagPorts = diagPortsArg(basePeer, serverDtlsPort, serverDirectPort, serverRawPort)
+                            diagPorts = diagPortsArg(basePeer, serverDtlsPort, serverDirectPort, serverRawPort),
+                            activeProtocolType = activeProtocolType,
+                            wireguardConfig = wireguardConfig
                         )
                         launch(Dispatchers.Main) {
                             startTunnel(
@@ -182,6 +190,9 @@ class TunnelService : Service() {
             try {
                 val store = SettingsStore(appContext)
                 SettingsStore.awaitMigrations(appContext)
+                val activeProtocolType = store.activeProtocolType.first()
+                val wireguardConfig = store.wireguardConfig.first()
+                val isDirectAwg = activeProtocolType == ConnectionProfile.PROTOCOL_WIREGUARD && wireguardConfig.isNotBlank()
                 val basePeer = store.peer.first()
                 val manualPortsEnabled = store.manualPortsEnabled.first()
                 val connectionModeRestore = SettingsStore.normalizeConnectionMode(store.connectionMode.first())
@@ -195,9 +206,12 @@ class TunnelService : Service() {
                     noDtlsEnabled -> serverDirectPort
                     else -> serverDtlsPort
                 }
-                val peerWithPort = if (basePeer.isBlank()) basePeer
-                    else if (isRawTunRestore || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003)) PeerAddress.withPort(basePeer, effectiveServerPort)
-                    else PeerAddress.ensurePort(basePeer, effectiveServerPort)
+                val peerWithPort = when {
+                    basePeer.isBlank() || isDirectAwg -> basePeer
+                    isRawTunRestore || noDtlsEnabled || PeerAddress.port(basePeer) in listOf(56000, 56002, 56003) ->
+                        PeerAddress.withPort(basePeer, effectiveServerPort)
+                    else -> PeerAddress.ensurePort(basePeer, effectiveServerPort)
+                }
                 val params = TunnelParams(
                     peer = peerWithPort,
                     vkHashes = store.vkHashes.first(),
@@ -222,9 +236,11 @@ class TunnelService : Service() {
                     turnHosts = store.turnHosts.first(),
                     detailedLogs = store.detailedLogs.first(),
                     diagKey = store.diagKey.first(),
-                    diagPorts = diagPortsArg(basePeer, serverDtlsPort, serverDirectPort, serverRawPort)
+                    diagPorts = diagPortsArg(basePeer, serverDtlsPort, serverDirectPort, serverRawPort),
+                    activeProtocolType = activeProtocolType,
+                    wireguardConfig = wireguardConfig
                 )
-                if (params.peer.isNotEmpty() && params.vkHashes.isNotEmpty()) {
+                if (params.isAmneziaWgDirect || (params.peer.isNotEmpty() && params.vkHashes.isNotEmpty())) {
                     launch(Dispatchers.Main) {
                         startTunnel(params)
                     }
@@ -674,7 +690,7 @@ class TunnelService : Service() {
                         stopSelf()
                         break
                     }
-                    if (TunnelManager.running.value && !isTunnelPaused && !TunnelManager.isSocksModeActive()) {
+                    if (TunnelManager.running.value && !isTunnelPaused && !TunnelManager.isSocksModeActive() && !TunnelManager.isRawTunModeActive()) {
                         val helper = WireGuardHelper(applicationContext)
                         when (helper.watchdogState()) {
                             WireGuardHelper.WatchdogState.UP -> wasEverUp = true
@@ -693,6 +709,19 @@ class TunnelService : Service() {
                                         wasEverUp = false
                                     }
                                 }
+                            }
+                        }
+                    } else if (TunnelManager.running.value && !isTunnelPaused && TunnelManager.isRawTunModeActive()) {
+                        if (RawTunEngine.running && RawTunVpnService.instance?.currentTunFd() != null) {
+                            wasEverUp = true
+                        } else if (wasEverUp && RawTunVpnService.instance?.currentTunFd() == null) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastVpnReconnectAttemptMs >= 15_000) {
+                                lastVpnReconnectAttemptMs = now
+                                Log.w("TunnelService", "RAW/AWG VPN-интерфейс пропал — пробуем переподключение")
+                                updateNotification("Переподключение VPN...")
+                                TunnelManager.reconnectAll("пропал VPN-интерфейс")
+                                wasEverUp = false
                             }
                         }
                     }

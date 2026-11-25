@@ -26,7 +26,7 @@ class TunnelWidgetProvider : AppWidgetProvider() {
         super.onReceive(context, intent)
 
         if (intent.action == ACTION_TOGGLE) {
-            if (TunnelManager.running.value) {
+            if (TunnelManager.running.value || TunnelManager.isConnecting.value) {
                 TunnelControl.stop(context)
             } else {
                 val needsVpnPermission = runCatching { VpnService.prepare(context) != null }
@@ -80,16 +80,7 @@ class TunnelWidgetProvider : AppWidgetProvider() {
                     views.setInt(R.id.widget_toggle_button, "setColorFilter", android.graphics.Color.parseColor("#3DDC84")) // Green play button
                 }
                 
-                // Set click listener
-                val intent = Intent(context, TunnelWidgetProvider::class.java).apply {
-                    action = ACTION_TOGGLE
-                }
-                val pendingIntent = PendingIntent.getBroadcast(
-                    context, 0, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_toggle_button, pendingIntent)
-                
+                bindWidgetClicks(context, views)
                 appWidgetManager.updateAppWidget(widgetId, views)
             }
         }
@@ -114,16 +105,28 @@ class TunnelWidgetProvider : AppWidgetProvider() {
                 views.setInt(R.id.widget_toggle_button, "setColorFilter", android.graphics.Color.parseColor("#3DDC84"))
             }
             
-            val intent = Intent(context, TunnelWidgetProvider::class.java).apply {
+            bindWidgetClicks(context, views)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        }
+
+        private fun bindWidgetClicks(context: Context, views: RemoteViews) {
+            val toggleIntent = Intent(context, TunnelWidgetProvider::class.java).apply {
                 action = ACTION_TOGGLE
             }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context, 0, intent,
+            val togglePendingIntent = PendingIntent.getBroadcast(
+                context, 0, toggleIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(R.id.widget_toggle_button, pendingIntent)
-            
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            views.setOnClickPendingIntent(R.id.widget_toggle_button, togglePendingIntent)
+
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            val openPendingIntent = PendingIntent.getActivity(
+                context, 1, openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_root, openPendingIntent)
         }
 
         private fun openVpnPermissionActivity(context: Context) {

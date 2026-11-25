@@ -5,17 +5,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"net"
 	"net/netip"
 	"strconv"
 	"strings"
 
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/tun/netstack"
+	"github.com/amnezia-vpn/amneziawg-go/v3/conn"
+	"github.com/amnezia-vpn/amneziawg-go/v3/device"
+	"github.com/amnezia-vpn/amneziawg-go/v3/tun/netstack"
 )
 
 type wgQuickConfig struct {
 	privateKeyHex string
+	presharedHex  string
 	addresses     []netip.Addr
 	dns           []netip.Addr
 	mtu           int
@@ -23,6 +25,12 @@ type wgQuickConfig struct {
 	allowedIPs    []string
 	endpoint      string
 	keepalive     uint16
+
+	// AmneziaWG obfuscation params (optional)
+	jc, jmin, jmax string
+	s1, s2, s3, s4 string
+	h1, h2, h3, h4 string
+	i1, i2, i3, i4, i5 string
 }
 
 func b64KeyToHex(b64 string) (string, error) {
@@ -101,6 +109,38 @@ func parseWgQuick(conf string) (*wgQuickConfig, error) {
 					return nil, fmt.Errorf("MTU %q: invalid", val)
 				}
 				cfg.mtu = mtu
+			case "jc":
+				cfg.jc = val
+			case "jmin":
+				cfg.jmin = val
+			case "jmax":
+				cfg.jmax = val
+			case "s1":
+				cfg.s1 = val
+			case "s2":
+				cfg.s2 = val
+			case "s3":
+				cfg.s3 = val
+			case "s4":
+				cfg.s4 = val
+			case "h1":
+				cfg.h1 = val
+			case "h2":
+				cfg.h2 = val
+			case "h3":
+				cfg.h3 = val
+			case "h4":
+				cfg.h4 = val
+			case "i1":
+				cfg.i1 = val
+			case "i2":
+				cfg.i2 = val
+			case "i3":
+				cfg.i3 = val
+			case "i4":
+				cfg.i4 = val
+			case "i5":
+				cfg.i5 = val
 			}
 		case "peer":
 			switch key {
@@ -110,6 +150,12 @@ func parseWgQuick(conf string) (*wgQuickConfig, error) {
 					return nil, fmt.Errorf("PublicKey: %w", err)
 				}
 				cfg.peerPublicHex = hexKey
+			case "presharedkey":
+				hexKey, err := b64KeyToHex(val)
+				if err != nil {
+					return nil, fmt.Errorf("PresharedKey: %w", err)
+				}
+				cfg.presharedHex = hexKey
 			case "allowedips":
 				for _, part := range strings.Split(val, ",") {
 					part = strings.TrimSpace(part)
@@ -149,8 +195,25 @@ func parseWgQuick(conf string) (*wgQuickConfig, error) {
 func (c *wgQuickConfig) ipcRequest() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "private_key=%s\n", c.privateKeyHex)
+	for _, kv := range [][2]string{
+		{"jc", c.jc}, {"jmin", c.jmin}, {"jmax", c.jmax},
+		{"s1", c.s1}, {"s2", c.s2}, {"s3", c.s3}, {"s4", c.s4},
+		{"h1", c.h1}, {"h2", c.h2}, {"h3", c.h3}, {"h4", c.h4},
+		{"i1", c.i1}, {"i2", c.i2}, {"i3", c.i3}, {"i4", c.i4}, {"i5", c.i5},
+	} {
+		if kv[1] != "" {
+			fmt.Fprintf(&b, "%s=%s\n", kv[0], kv[1])
+		}
+	}
+	endpoint := c.endpoint
+	if addr, err := net.ResolveUDPAddr("udp", endpoint); err == nil && addr != nil {
+		endpoint = addr.String()
+	}
 	fmt.Fprintf(&b, "public_key=%s\n", c.peerPublicHex)
-	fmt.Fprintf(&b, "endpoint=%s\n", c.endpoint)
+	if c.presharedHex != "" {
+		fmt.Fprintf(&b, "preshared_key=%s\n", c.presharedHex)
+	}
+	fmt.Fprintf(&b, "endpoint=%s\n", endpoint)
 	fmt.Fprintf(&b, "persistent_keepalive_interval=%d\n", c.keepalive)
 	for _, ip := range c.allowedIPs {
 		fmt.Fprintf(&b, "allowed_ip=%s\n", ip)

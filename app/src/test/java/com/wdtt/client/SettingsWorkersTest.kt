@@ -52,4 +52,20 @@ class SettingsWorkersTest {
         assertEquals(listOf(9, 18, 27, 36, 45, 54), options)
         assertTrue(options.all { it % 9 == 0 })
     }
+
+    @Test
+    fun testTunnelParams_amneziaWgDirectInvariants() {
+        val params = TunnelParams(
+            peer = "48.102.173.96:585",
+            vkHashes = "",
+            workersPerHash = 9,
+            port = 9000,
+            connectionMode = SettingsStore.CONNECTION_MODE_SOCKS,
+            activeProtocolType = ConnectionProfile.PROTOCOL_WIREGUARD,
+            wireguardConfig = "[Interface]\nPrivateKey=aaa\nJc=6\n[Peer]\nEndpoint=48.102.173.96:585"
+        )
+        assertTrue(params.isAmneziaWgDirect)
+        assertTrue(params.isRawTunMode)
+        org.junit.Assert.assertFalse("AmneziaWG direct must not be treated as SOCKS mode", params.isSocksMode)
+    }
 }

@@ -23,9 +23,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wdtt.client.ConnectionProfile
+import com.wdtt.client.ProfileSubscription
 import com.wdtt.client.ProfileUnbindHelper
 import com.wdtt.client.ProfilesStore
 import com.wdtt.client.SettingsStore
+import com.wdtt.client.TunnelControl
+import com.wdtt.client.TunnelManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,9 +55,40 @@ fun ProfilesBottomSheet(
     var unbindTargetProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
     var isUnbinding by remember { mutableStateOf(false) }
     var pcConfirmProfile by remember { mutableStateOf<ConnectionProfile?>(null) }
+    var deleteTargetSub by remember { mutableStateOf<ProfileSubscription?>(null) }
 
     val sortedProfiles = remember(profiles) {
-        profiles.sortedWith(compareBy<ConnectionProfile> { it.isPcDevice }.thenBy { it.name })
+        profiles.sortedWith(
+            compareBy<ConnectionProfile> { it.isPcDevice }
+                .thenBy { !it.isWireGuard }
+                .thenBy { it.name }
+        )
+    }
+
+    fun selectProfile(target: ConnectionProfile) {
+        val isYd = target.isYandexDocs || target.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
+        if (isYd) {
+            Toast.makeText(
+                context,
+                "Обход через Яндекс.Документы (OpenFlux) находится в разработке",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val wasRunning = TunnelManager.running.value || TunnelManager.isConnecting.value
+        val changed = target.id != currentProfileId
+        scope.launch {
+            if (wasRunning && changed) {
+                TunnelControl.stop(context.applicationContext)
+                delay(450)
+            }
+            profilesStore.applyProfile(context, target.id)
+            if (wasRunning && changed) {
+                TunnelControl.startFromSavedSettings(context.applicationContext)
+                Toast.makeText(context, "Переподключение: ${target.name}", Toast.LENGTH_SHORT).show()
+            }
+            onDismiss()
+        }
     }
 
     ModalBottomSheet(
@@ -123,6 +158,56 @@ fun ProfilesBottomSheet(
                 }
             }
 
+            if (subscriptions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    subscriptions.forEach { sub ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = sub.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    if (sub.lastSyncError.isNotBlank()) {
+                                        Text(
+                                            text = "Ошибка: ${sub.lastSyncError}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    } else if (sub.description.isNotBlank()) {
+                                        Text(
+                                            text = sub.description,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { deleteTargetSub = sub },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.DeleteOutline,
+                                        contentDescription = "Удалить подписку",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (profiles.isEmpty()) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -180,17 +265,10 @@ fun ProfilesBottomSheet(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable {
-                                    if (isPc && !isSelected) {
+                                    if (isPc && !isSelected && !isYd) {
                                         pcConfirmProfile = profile
                                     } else {
-                                        scope.launch {
-                                            if (isYd && !yandexDocsEnabled) {
-                                                settingsStore.saveYandexDocsEnabled(true)
-                                                Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
-                                            }
-                                            profilesStore.applyProfile(context, profile.id)
-                                            onDismiss()
-                                        }
+                                        selectProfile(profile)
                                     }
                                 }
                         ) {
@@ -422,15 +500,7 @@ fun ProfilesBottomSheet(
                 Button(
                     onClick = {
                         pcConfirmProfile = null
-                        scope.launch {
-                            val isYd = target.isYandexDocs || target.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
-                            if (isYd && !yandexDocsEnabled) {
-                                settingsStore.saveYandexDocsEnabled(true)
-                                Toast.makeText(context, "Включён эксперимент: Яндекс.Документы", Toast.LENGTH_SHORT).show()
-                            }
-                            profilesStore.applyProfile(context, target.id)
-                            onDismiss()
-                        }
+                        selectProfile(target)
                     }
                 ) {
                     Text("Подключить")
@@ -499,6 +569,37 @@ fun ProfilesBottomSheet(
                     onClick = { unbindTargetProfile = null },
                     enabled = !isUnbinding
                 ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (deleteTargetSub != null) {
+        val targetSub = deleteTargetSub!!
+        AlertDialog(
+            onDismissRequest = { deleteTargetSub = null },
+            title = { Text("Удалить подписку?") },
+            text = { Text("Подписка «${targetSub.name}» и все связанные с ней серверы будут удалены из приложения.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deleteTargetSub = null
+                        scope.launch {
+                            if (TunnelManager.running.value || TunnelManager.isConnecting.value) {
+                                TunnelControl.stop(context.applicationContext)
+                            }
+                            profilesStore.deleteSubscription(targetSub.id)
+                            Toast.makeText(context, "Подписка удалена", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTargetSub = null }) {
                     Text("Отмена")
                 }
             }

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/armon/go-socks5"
-	"golang.zx2c4.com/wireguard/tun/netstack"
+	"github.com/amnezia-vpn/amneziawg-go/v3/tun/netstack"
 )
 
 type netstackNameResolver struct {

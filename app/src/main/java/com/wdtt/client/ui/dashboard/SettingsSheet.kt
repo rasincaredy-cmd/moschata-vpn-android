@@ -60,11 +60,24 @@ fun SettingsSheet(
         (1..(hashCount * 3)).map { it * 9 }
     }
     val turnTransport by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = "udp")
+    val vkAuthMode by settingsStore.vkAuthMode.collectAsStateWithLifecycle(initialValue = "anonymous")
+    val goDnsPreset by settingsStore.goDnsPreset.collectAsStateWithLifecycle(initialValue = "yandex")
+    val detailedLogs by settingsStore.detailedLogs.collectAsStateWithLifecycle(initialValue = false)
     val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
     val peer by settingsStore.peer.collectAsStateWithLifecycle(initialValue = "")
 
     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
     var isIgnoringBattery by remember { mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName)) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isIgnoringBattery = powerManager.isIgnoringBatteryOptimizations(context.packageName)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     var isCheckingUpdates by remember { mutableStateOf(false) }
 
@@ -361,6 +374,87 @@ fun SettingsSheet(
                                 "UDP: минимальный пинг и задержка при обычном обходе Белого Списка.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 4. Авторизация VK (Анонимно / Аккаунт VK)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Авторизация VK для обхода", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = vkAuthMode == "anonymous",
+                                onClick = { scope.launch { settingsStore.saveVkAuthMode("anonymous") } },
+                                label = { Text("Анонимно") }
+                            )
+                            FilterChip(
+                                selected = vkAuthMode == "account",
+                                onClick = { scope.launch { settingsStore.saveVkAuthMode("account") } },
+                                label = { Text("Аккаунт VK") }
+                            )
+                        }
+                        Text(
+                            text = if (vkAuthMode == "account")
+                                "Аккаунт VK: вход через ваш профиль VK (меньше капч, потоки ограничены 4)."
+                            else
+                                "Анонимно: быстрое подключение без входа в аккаунт, до 27 потоков на хеш.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 5. DNS резолвер
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("DNS для подключения", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                "yandex" to "Яндекс",
+                                "doh-yandex" to "DoH Яндекс",
+                                "cloudflare" to "Cloudflare",
+                                "google" to "Google",
+                                "operator" to "Операторский"
+                            ).forEach { (key, title) ->
+                                FilterChip(
+                                    selected = goDnsPreset == key,
+                                    onClick = { scope.launch { settingsStore.saveGoDns(key) } },
+                                    label = { Text(title) }
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 6. Подробные логи диагностики
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Подробный журнал диагностики", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Показывать технические события DNS, RAW TUN и капчи",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = detailedLogs,
+                            onCheckedChange = { checked ->
+                                scope.launch { settingsStore.saveDetailedLogs(checked) }
+                            }
                         )
                     }
                 }

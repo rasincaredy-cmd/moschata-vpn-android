@@ -74,7 +74,17 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 val store = SettingsStore(applicationContext)
                 val peer = store.peer.first()
-                if (peer.isBlank()) {
+                val wgConf = store.wireguardConfig.first()
+                val activeProto = store.activeProtocolType.first()
+                if (activeProto == ConnectionProfile.PROTOCOL_YANDEX_DOCS) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Режим Яндекс.Документы (OpenFlux) в разработке. Выберите Обычный VPN или Обход БС.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@launch
+                }
+                if (peer.isBlank() && wgConf.isBlank()) {
                     Toast.makeText(this@MainActivity, "Сначала добавьте подписку или выберите сервер", Toast.LENGTH_SHORT).show()
                     return@launch
                 }
@@ -184,10 +194,15 @@ class MainActivity : ComponentActivity() {
             var showBatteryDialog by rememberSaveable { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
+                val prefs = getSharedPreferences("moschata_ui_prefs", MODE_PRIVATE)
+                val alreadyPrompted = prefs.getBoolean("battery_prompt_shown", false)
                 val pm = getSystemService(POWER_SERVICE) as PowerManager
-                if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                    kotlinx.coroutines.delay(1000)
-                    showBatteryDialog = true
+                if (!alreadyPrompted && !pm.isIgnoringBatteryOptimizations(packageName)) {
+                    kotlinx.coroutines.delay(1500)
+                    if (pendingRelease == null) {
+                        showBatteryDialog = true
+                        prefs.edit().putBoolean("battery_prompt_shown", true).apply()
+                    }
                 }
             }
 

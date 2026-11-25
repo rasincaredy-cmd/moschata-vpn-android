@@ -429,6 +429,8 @@ class ProfilesStore(context: Context) {
         toDelete.forEach { deleteProfile(it.id) }
         if (toDelete.any { it.id == currentId }) {
             settings.saveCurrentProfile("", "")
+            settings.saveWireguardConfig("")
+            settings.saveActiveProtocolType(ConnectionProfile.PROTOCOL_QWDTT)
         }
     }
 
@@ -450,9 +452,34 @@ class ProfilesStore(context: Context) {
     }
 
     suspend fun importProfilesToGroup(groupName: String, profiles: List<ConnectionProfile>, fromSubscription: Boolean = false) = withContext(Dispatchers.IO) {
+        val prevId = settings.currentProfileId.first()
+        val prevProfile = prevId.takeIf { it.isNotBlank() }?.let { getProfileOnce(it) }
+
         val groupId = resolveGroupIdForImport(groupName, fromSubscription)
+        val saved = mutableListOf<ConnectionProfile>()
         for (p in profiles) {
-            saveProfile(p.copy(id = UUID.randomUUID().toString(), groupId = groupId), fromSubscriptionSync = fromSubscription)
+            val copy = p.copy(id = UUID.randomUUID().toString(), groupId = groupId)
+            saveProfile(copy, fromSubscriptionSync = fromSubscription)
+            saved.add(copy)
+        }
+
+        val currentAfterImport = settings.currentProfileId.first()
+        if (currentAfterImport.isBlank() && saved.isNotEmpty()) {
+            val chosen = if (prevProfile != null) {
+                saved.find { it.protocolType == prevProfile.protocolType && it.deviceType == prevProfile.deviceType && it.password.isNotBlank() && it.password == prevProfile.password }
+                    ?: saved.find { it.protocolType == prevProfile.protocolType && it.name == prevProfile.name }
+                    ?: saved.find { it.protocolType == prevProfile.protocolType && !it.isPcDevice }
+                    ?: saved.find { it.protocolType == prevProfile.protocolType }
+            } else {
+                null
+            } ?: (
+                saved.find { it.isWireGuard && !it.isPcDevice }
+                    ?: saved.find { it.isWireGuard }
+                    ?: saved.find { it.protocolType == ConnectionProfile.PROTOCOL_QWDTT && !it.isPcDevice }
+                    ?: saved.find { it.protocolType == ConnectionProfile.PROTOCOL_QWDTT }
+                    ?: saved.first()
+                )
+            applyProfile(appContext, chosen.id)
         }
     }
 
@@ -532,8 +559,10 @@ class ProfilesStore(context: Context) {
         }
         val manualPorts = settings.manualPortsEnabled.first()
         val serverDtlsPort = if (manualPorts) settings.serverDtlsPort.first() else 56000
-        val peerWithPort = PeerAddress.ensurePort(p.peer, serverDtlsPort)
-        settings.save(peerWithPort, finalHashes, "", p.workersPerHash, "udp", p.listenPort)
+        val peerWithPort = if (p.isWireGuard || p.isYandexDocs) p.peer else PeerAddress.ensurePort(p.peer, serverDtlsPort)
+        val preservedWorkers = settings.workersPerHash.first().takeIf { it > 0 } ?: p.workersPerHash.coerceAtLeast(9)
+        val effectiveListenPort = if (p.listenPort > 0) p.listenPort else settings.listenPort.first().takeIf { it > 0 } ?: 9000
+        settings.save(peerWithPort, finalHashes, "", preservedWorkers, "udp", effectiveListenPort)
         settings.saveConnectionPassword(p.password)
         settings.saveDiagKey(p.diagKey)
         settings.saveActiveProtocolType(p.protocolType)

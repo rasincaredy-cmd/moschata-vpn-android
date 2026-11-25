@@ -183,7 +183,8 @@ func main() {
 	dnsFallback := flag.String("dns-fallback", "", "DNS текущей сети (оператора/роутера) через запятую — запасной для -go-dns, основной для -go-dns operator")
 	obfsMode := flag.String("obfs", "audio", "режим обфускации (audio/video)")
 	checkHashes := flag.Bool("check-hashes", false, "проверить VK-хеши и выйти")
-	connMode := flag.String("mode", "vpn", "режим клиента (vpn|socks|rawtun)")
+	connMode := flag.String("mode", "vpn", "режим клиента (vpn|socks|rawtun|amneziawg)")
+	awgConfPath := flag.String("awg-conf", "", "путь к конфигу AmneziaWG/WireGuard (только -mode amneziawg)")
 	socksAddr := flag.String("socks", "127.0.0.1:1080", "локальный SOCKS5 (только -mode socks)")
 	socksAuth := flag.Bool("socks-auth", false, "требовать логин и пароль SOCKS5")
 	socksUser := flag.String("socks-user", "", "логин SOCKS5")
@@ -200,7 +201,7 @@ func main() {
 
 	flag.Parse()
 	activeConnMode := strings.ToLower(strings.TrimSpace(*connMode))
-	if activeConnMode != "socks" && activeConnMode != "rawtun" {
+	if activeConnMode != "socks" && activeConnMode != "rawtun" && activeConnMode != "amneziawg" {
 		activeConnMode = "vpn"
 	}
 	if activeConnMode == "socks" && *socksAuth {
@@ -212,6 +213,10 @@ func main() {
 		}
 	}
 	setupGlobalResolver(*goDNS, parseDNSFallback(*dnsFallback))
+	if activeConnMode == "amneziawg" {
+		runAmneziaWGMode(ctx, *awgConfPath, *tunFdSock)
+		return
+	}
 	activeCaptchaMode := setCaptchaMode(*captchaMode)
 	activeVkAuthMode := setVkAuthMode(*vkAuthMode)
 	activeVkAnonPath := setVkAnonPath(*vkAnonPath)

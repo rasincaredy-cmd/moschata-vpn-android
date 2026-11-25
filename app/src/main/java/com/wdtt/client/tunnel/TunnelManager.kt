@@ -386,27 +386,58 @@ object TunnelManager {
                     }
                 }
 
-                // Прямой скоростной WireGuard VPN (без обхода через VK TURN)
-                val activeProtocol = runCatching { SettingsStore(appContext).activeProtocolType.first() }.getOrDefault(ConnectionProfile.PROTOCOL_QWDTT)
-                val wireguardConf = runCatching { SettingsStore(appContext).wireguardConfig.first() }.getOrDefault("")
-                if (activeProtocol == ConnectionProfile.PROTOCOL_WIREGUARD && wireguardConf.isNotBlank()) {
-                    updateLog("conn_mode", "[СЕТЬ] Режим: Скоростной WireGuard (прямой туннель)", 1, false)
-                    setConnectionPipelineCurrent(ConnectionStep.VPN)
-                    try {
-                        wgHelper?.startTunnel(wireguardConf)
-                        config.value = wireguardConf
-                        markRunning(true)
-                        isConnecting.value = false
-                        stats.value = "Подключено (WireGuard)"
-                        markConnectionPipelineCompleted(ConnectionStep.VPN)
-                        finishConnectionPipeline()
-                        return@launch
-                    } catch (e: Exception) {
-                        failConnectionPipeline(ConnectionStep.VPN)
-                        updateLog("wg_error", "Ошибка запуска WireGuard: ${e.message}", 99, true)
-                        abortStart(isSwitching, "WireGuard: ${e.message}")
+                // Прямой скоростной AmneziaWG / WireGuard VPN (через amneziawg-go + RawTunVpnService)
+                if (params.isAmneziaWgDirect) {
+                    val binaryPath = context.applicationInfo.nativeLibraryDir + "/libclient.so"
+                    val binaryFile = File(binaryPath)
+                    if (!binaryFile.exists()) {
+                        updateLog("binary_error", "Ошибка: Бинарный файл не найден", 99, true)
+                        abortStart(isSwitching, "Бинарный файл не найден")
                         return@launch
                     }
+
+                    withContext(Dispatchers.IO) {
+                        ensureTransportStopped(params.port)
+                    }
+
+                    val confFile = File(appContext.filesDir, "awg_active.conf")
+                    confFile.writeText(params.wireguardConfig, Charsets.UTF_8)
+                    rawTunSockName = TunFdBridge.newSocketName()
+
+                    val cmd = mutableListOf(
+                        binaryPath,
+                        "-mode", "amneziawg",
+                        "-awg-conf", confFile.absolutePath,
+                        "-tun-fd-sock", TunFdBridge.goSockPath(rawTunSockName),
+                        "-go-dns", params.goDnsArg
+                    )
+                    val networkDns = NetworkDns.current(appContext)
+                    if (networkDns.isNotEmpty()) {
+                        cmd.add("-dns-fallback")
+                        cmd.add(networkDns.joinToString(","))
+                    }
+
+                    hideConnectionPipeline()
+                    updateLog("conn_mode", "[СЕТЬ] Режим: Обычный VPN (AmneziaWG)", 1, false)
+
+                    val pb = ProcessBuilder(cmd)
+                    pb.directory(context.filesDir)
+                    pb.redirectErrorStream(true)
+                    pb.environment()["LD_LIBRARY_PATH"] = context.applicationInfo.nativeLibraryDir
+
+                    process = pb.start()
+                    processStartedAtMs = System.currentTimeMillis()
+                    lastActiveAtMs = 0L
+                    lastStatsReceivedAtMs = System.currentTimeMillis()
+                    if (!isSwitching) {
+                        transportRestartInProgress = false
+                    }
+                    isConnecting.value = false
+                    markRunning(true)
+                    stats.value = "Подключение AmneziaWG…"
+                    startLogReader()
+                    startWatchdog(appContext, params)
+                    return@launch
                 }
 
                 val targetHash = if (activeHashIndex == 0) params.vkHashes else params.secondaryVkHash
@@ -726,6 +757,9 @@ object TunnelManager {
     }
 
     private fun abortStart(isSwitching: Boolean, message: String) {
+        if (message.isNotBlank()) {
+            lastFatalError.value = message
+        }
         if (isSwitching) {
             handleSwitchingStartFailed(message)
         } else {
@@ -1412,6 +1446,7 @@ object TunnelManager {
     }
 
     private fun handleCriticalError(message: String) {
+        lastFatalError.value = message
         updateLog("circuit_breaker", "[СТОП] $message", -1, true)
         stop()
     }
@@ -1460,7 +1495,14 @@ object TunnelManager {
 
                 // Детекция зомби: процесс жив, но 0 воркеров
                 val workers = activeWorkers.value
-                if (workers <= 0) {
+                if (params.isAmneziaWgDirect) {
+                    if (workers > 0) {
+                        zeroWorkersSince = 0L
+                        restartAttempts = 0
+                    } else if (processStartedAtMs > 0L && System.currentTimeMillis() - processStartedAtMs > 20_000) {
+                        lastFatalError.value = "Нет ответа от сервера AmneziaWG (${params.peer}) — попробуйте «Обход БС»"
+                    }
+                } else if (workers <= 0) {
                     if (zeroWorkersSince == 0L) {
                         zeroWorkersSince = System.currentTimeMillis()
                     } else if (
@@ -2364,15 +2406,20 @@ data class TunnelParams(
     /** Ключ диагностики сервера (dk= из ссылки), пусто — нет. */
     val diagKey: String = "",
     /** Порты сервера для проверки: "dtls=56000,direct=56002,raw=56003". */
-    val diagPorts: String = ""
+    val diagPorts: String = "",
+    val activeProtocolType: String = ConnectionProfile.PROTOCOL_QWDTT,
+    val wireguardConfig: String = ""
 ) {
-    /** Go поднимает локальный SOCKS5 (userspace WG) вместо Android GoBackend — верно и для socks, и для rawtun. */
-    val isSocksMode: Boolean
-        get() = SettingsStore.normalizeConnectionMode(connectionMode) != SettingsStore.CONNECTION_MODE_VPN
+    val isAmneziaWgDirect: Boolean
+        get() = activeProtocolType == ConnectionProfile.PROTOCOL_WIREGUARD && wireguardConfig.isNotBlank()
 
-    /** rawtun: сырые IP-пакеты напрямую в go_client через TUN-fd, без WireGuard вообще (ни Android, ни userspace). */
+    /** Go поднимает локальный SOCKS5 (userspace WG) вместо Android GoBackend — верно для socks и rawtun (не для прямого AmneziaWG). */
+    val isSocksMode: Boolean
+        get() = !isAmneziaWgDirect && SettingsStore.normalizeConnectionMode(connectionMode) != SettingsStore.CONNECTION_MODE_VPN
+
+    /** rawtun: сырые IP-пакеты или прямой AmneziaWG напрямую в go_client через TUN-fd. */
     val isRawTunMode: Boolean
-        get() = SettingsStore.normalizeConnectionMode(connectionMode) == SettingsStore.CONNECTION_MODE_RAWTUN
+        get() = isAmneziaWgDirect || SettingsStore.normalizeConnectionMode(connectionMode) == SettingsStore.CONNECTION_MODE_RAWTUN
 
     val socksListenAddress: String
         get() = SettingsStore.socksListenAddress(socksPort)
