@@ -48,7 +48,11 @@ object TunnelManager {
     @Volatile
     private var isDetailedLogsEnabled = false
     @Volatile
+    private var isExtendedNotificationStats = false
+    @Volatile
     private var isConnectionPipelineEnabled = true
+    private var lastAutoUnbindProfileId: String = ""
+    private var lastAutoUnbindAtMs: Long = 0L
 
     // Error counters for circuit breaker
     private var floodCount = 0
@@ -106,6 +110,8 @@ object TunnelManager {
     val lastFatalError = MutableStateFlow<String?>(null)
     val config = MutableStateFlow<String?>(null)
     val stats = MutableStateFlow("Ожидание данных...")
+    /** Текст для шторки уведомлений (чистый для юзера по умолчанию или подробный). */
+    val notificationStats = MutableStateFlow("Подключение...")
     val activeWorkers = MutableStateFlow(0)
     val isReconnecting = MutableStateFlow(false)
     val connectionPipeline = MutableStateFlow(ConnectionPipelineState())
@@ -313,16 +319,23 @@ object TunnelManager {
             connectingStartedAtMs = System.currentTimeMillis()
             isConnecting.value = true
             stats.value = "Подключение…"
+            notificationStats.value = "Подключение…"
             
             detailedLogsJob?.cancel()
             detailedLogsJob = scope.launch {
+                val store = SettingsStore(appContext)
                 launch {
-                    SettingsStore(appContext).detailedLogs.collect {
+                    store.detailedLogs.collect {
                         isDetailedLogsEnabled = it
                     }
                 }
                 launch {
-                    SettingsStore(appContext).connectionPipelineEnabled.collect { enabled ->
+                    store.extendedNotificationStats.collect {
+                        isExtendedNotificationStats = it
+                    }
+                }
+                launch {
+                    store.connectionPipelineEnabled.collect { enabled ->
                         isConnectionPipelineEnabled = enabled
                         if (!enabled) hideConnectionPipeline()
                     }
@@ -432,9 +445,13 @@ object TunnelManager {
                     if (!isSwitching) {
                         transportRestartInProgress = false
                     }
-                    isConnecting.value = false
-                    markRunning(true)
-                    stats.value = "Подключение AmneziaWG…"
+                    // Не помечаем как running до реального подтверждения рукопожатия (Активных > 0)
+                    if (!isSwitching) {
+                        isConnecting.value = true
+                        markRunning(false)
+                    }
+                    stats.value = "Рукопожатие с сервером…"
+                    notificationStats.value = "Ожидание ответа сервера…"
                     startLogReader()
                     startWatchdog(appContext, params)
                     return@launch
@@ -730,10 +747,11 @@ object TunnelManager {
                 lastStatsReceivedAtMs = System.currentTimeMillis()
                 if (!isSwitching) {
                     transportRestartInProgress = false
+                    isConnecting.value = true
+                    markRunning(false)
                 }
-                isConnecting.value = false
-                markRunning(true)
-                stats.value = "Ожидание данных..."
+                stats.value = "Установка соединения…"
+                notificationStats.value = "Подключение к серверам…"
                 startLogReader()
                 startWatchdog(appContext, params)
 
@@ -873,10 +891,45 @@ object TunnelManager {
 
                     // 0. FATAL AUTH — мгновенная остановка (пароль / срок / устройство)
                     if (lineTrim.contains("FATAL_AUTH")) {
+                        val isDeviceMismatch = lineTrim.contains("другому устройству")
+                        if (isDeviceMismatch) {
+                            val ctx = lastContext?.get()?.applicationContext
+                            val profId = activeProfileId
+                            val nowUnbind = System.currentTimeMillis()
+                            val canAutoUnbind = ctx != null && profId.isNotBlank() &&
+                                (profId != lastAutoUnbindProfileId || nowUnbind - lastAutoUnbindAtMs > 30_000L)
+                            if (canAutoUnbind) {
+                                lastAutoUnbindProfileId = profId
+                                lastAutoUnbindAtMs = nowUnbind
+                                scope.launch {
+                                    val store = ProfilesStore(ctx!!)
+                                    val profile = store.profiles.first().find { it.id == profId }
+                                    val subUrl = profile?.groupId?.let { gid ->
+                                        store.subscriptions.first().find { it.groupId == gid }?.url
+                                    }
+                                    if (profile != null && !subUrl.isNullOrBlank()) {
+                                        updateLog("auto_unbind", "[ВК] Сброс старой привязки устройства через подписку…", 5, false)
+                                        val unbindRes = ProfileUnbindHelper.unbindProfile(ctx, profile, subscriptionUrl = subUrl)
+                                        if (unbindRes.isSuccess) {
+                                            withContext(Dispatchers.Main) {
+                                                stop(force = true)
+                                            }
+                                            delay(450)
+                                            withContext(Dispatchers.Main) {
+                                                TunnelControl.startFromSavedSettings(ctx)
+                                            }
+                                            return@launch
+                                        }
+                                    }
+                                    handleCriticalError("\uD83D\uDD12 Пароль привязан к другому устройству. Нажмите «Отвязать» и попробуйте снова.")
+                                }
+                                return@forEachLine
+                            }
+                        }
                         val reason = when {
                             lineTrim.contains("неверный пароль") -> "Неверный пароль подключения"
                             lineTrim.contains("истёк") -> "Срок действия пароля истёк"
-                            lineTrim.contains("другому устройству") -> "Пароль привязан к другому устройству"
+                            isDeviceMismatch -> "Пароль привязан к другому устройству"
                             else -> "Ошибка авторизации"
                         }
                         handleCriticalError("\uD83D\uDD12 $reason. Воркеры остановлены.")
@@ -993,19 +1046,56 @@ object TunnelManager {
                     // 1. Статистика (Обновляемая строка)
                     if (lineTrim.contains("[СТАТИСТИКА]")) {
                         val msg = lineTrim.substringAfter("[СТАТИСТИКА]").trim()
-                        stats.value = msg
                         lastStatsReceivedAtMs = now
 
                         val match = Regex("Активных:\\s*(\\d+)").find(msg)
-                        if (match != null) {
-                            val active = match.groupValues[1].toIntOrNull() ?: 0
-                            activeWorkers.value = active
-                            if (active > 0) {
-                                lastActiveAtMs = now
-                                wrapAuthTimeoutCount = 0
-                                if (connectionPipeline.value.failed == null) {
-                                    finishConnectionPipeline()
+                        val active = match?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+                        activeWorkers.value = active
+                        if (active > 0) {
+                            lastActiveAtMs = now
+                            wrapAuthTimeoutCount = 0
+                            // Момент реального подтверждения связи: только сейчас заканчиваем CONNECTING
+                            // и запускаем таймер сессии.
+                            if (isConnecting.value || !running.value) {
+                                isConnecting.value = false
+                                markRunning(true)
+                            }
+                            if (connectionPipeline.value.failed == null) {
+                                finishConnectionPipeline()
+                            }
+                        }
+
+                        val speedStr = Regex("Скорость:\\s*([^|]+)").find(msg)
+                            ?.groupValues?.getOrNull(1)?.trim()
+                        val trafficTotalStr = Regex("Трафик:\\s*([\\d.,]+\\s*МБ)").find(msg)
+                            ?.groupValues?.getOrNull(1)?.trim()
+
+                        val isDirectVpn = currentParams?.isAmneziaWgDirect == true
+                        if (active <= 0 && !running.value) {
+                            val waitingText = if (isDirectVpn) "Рукопожатие с сервером…" else "Подключение к серверам…"
+                            stats.value = waitingText
+                            notificationStats.value = waitingText
+                        } else {
+                            val cleanDashStats = listOfNotNull(
+                                speedStr,
+                                trafficTotalStr?.let { "Трафик: $it" }
+                            ).joinToString(" | ").ifBlank { msg }
+                            stats.value = cleanDashStats
+
+                            notificationStats.value = if (isExtendedNotificationStats) {
+                                if (isDirectVpn) {
+                                    // Для обычного VPN скрываем бессмысленное «Активных: 1», но оставляем всю скорость и трафик ↓ / ↑
+                                    msg.replace(Regex("^Активных:\\s*\\d+\\s*\\|\\s*"), "Канал OK | ")
+                                } else {
+                                    msg
                                 }
+                            } else {
+                                val modeTag = if (isDirectVpn) "Защищено" else "Обход БС"
+                                listOfNotNull(
+                                    modeTag,
+                                    speedStr,
+                                    trafficTotalStr?.let { "Трафик: $it" }
+                                ).joinToString(" · ")
                             }
                         }
 
@@ -1250,7 +1340,12 @@ object TunnelManager {
                                         RawTunEngine.start(rawCtx, ip, dnsCsv, mtu, rawTunSockName)
                                         markConnectionPipelineCompleted(ConnectionStep.RAW)
                                         finishConnectionPipeline()
-                                        stats.value = "RAW $ip"
+                                        updateLog("rawtun_addr", "[RAW] TUN адрес: $ip (MTU $mtu)", 1, false)
+                                        if (!running.value) {
+                                            val waitHint = if (rawParams?.isAmneziaWgDirect == true) "Рукопожатие с сервером…" else "Ожидание ответа сервера…"
+                                            stats.value = waitHint
+                                            notificationStats.value = waitHint
+                                        }
                                     } catch (e: Exception) {
                                         failConnectionPipeline(ConnectionStep.RAW)
                                         val msg = "Ошибка запуска VPN-интерфейса: ${e.readableMessage()}"
@@ -1476,17 +1571,21 @@ object TunnelManager {
         watchdogJob?.cancel()
         watchdogJob = scope.launch {
             var zeroWorkersSince = 0L
-            delay(10_000) // Даём 10 сек на старт
-            while (isActive && running.value) {
+            delay(3_000) // Быстрая начальная проверка, пока идёт соединение
+            while (isActive && (running.value || isConnecting.value)) {
                 val proc = process
                 if (proc == null || !proc.isAlive) {
+                    if (isConnecting.value && !running.value) {
+                        handleCriticalError("Соединение прервано: не удалось связаться с сервером.")
+                        return@launch
+                    }
                     // Go-процесс мёртв! применяем экспоненциальный бэкофф перед перезапуском
                     val backoffMs = min(maxRestartBackoffSec * 1000L, (1000.0 * 2.0.pow(restartAttempts.toDouble())).toLong())
                     updateLog("watchdog", "⚠ Процесс упал. Перезапуск... (попытка ${restartAttempts + 1}, задержка ${backoffMs / 1000}s)", 50, true)
                     activeWorkers.value = 0
                     forceRegenerateUA = true
                     delay(backoffMs)
-                    if (running.value) {
+                    if (running.value || isConnecting.value) {
                         restartAttempts = (restartAttempts + 1).coerceAtMost(6)
                         reconnectAll("процесс упал")
                     }
@@ -1831,9 +1930,14 @@ object TunnelManager {
         // stopJob, а не блокирует вызывающий (обычно главный) поток.
         watchdogJob?.cancel()
         readerJob?.cancel()
+        val wasActiveOrConnecting = running.value || isConnecting.value
         markRunning(false)
         isConnecting.value = false
         activeWorkers.value = 0
+        notificationStats.value = "Ожидание данных..."
+        if (wasActiveOrConnecting && lastFatalError.value == null) {
+            updateLog("tunnel_stopped", "[СТОП] Туннель остановлен", 50, false)
+        }
         interruptDiagnostics()
         // При ошибке шага оставляем схему с крестиком; иначе прячем.
         if (connectionPipeline.value.failed == null) {

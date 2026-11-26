@@ -48,21 +48,10 @@ fun SettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val autoConnect by settingsStore.autoStartOnBoot.collectAsStateWithLifecycle(initialValue = false)
+    val extendedNotificationStats by settingsStore.extendedNotificationStats.collectAsStateWithLifecycle(initialValue = false)
     val yandexDocsEnabled by settingsStore.yandexDocsEnabled.collectAsStateWithLifecycle(initialValue = false)
     val developerModeEnabled by settingsStore.developerModeEnabled.collectAsStateWithLifecycle(initialValue = false)
     val devAllowBypassOnFreeNet by settingsStore.devAllowBypassOnFreeNet.collectAsStateWithLifecycle(initialValue = false)
-    val connectionMode by settingsStore.connectionMode.collectAsStateWithLifecycle(initialValue = SettingsStore.CONNECTION_MODE_VPN)
-    val workersPerHash by settingsStore.workersPerHash.collectAsStateWithLifecycle(initialValue = 9)
-    val vkHashes by settingsStore.vkHashes.collectAsStateWithLifecycle(initialValue = "")
-    val hashCount = remember(vkHashes) {
-        val count = vkHashes.split(Regex("[,\\s\\n]+")).filter { it.isNotBlank() }.size
-        count.coerceIn(1, SettingsStore.MAX_VK_HASHES)
-    }
-    val workerOptions = remember(hashCount) {
-        (1..(hashCount * 3)).map { it * 9 }
-    }
-    val turnTransport by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = "udp")
-    val vkAuthMode by settingsStore.vkAuthMode.collectAsStateWithLifecycle(initialValue = "anonymous")
     val goDnsPreset by settingsStore.goDnsPreset.collectAsStateWithLifecycle(initialValue = "yandex")
     val detailedLogs by settingsStore.detailedLogs.collectAsStateWithLifecycle(initialValue = false)
     val currentProfileName by settingsStore.currentProfileName.collectAsStateWithLifecycle(initialValue = "")
@@ -205,6 +194,30 @@ fun SettingsSheet(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
+                    // Подробная статистика в уведомлении
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text("Подробная статистика в уведомлении", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "Показывать число потоков и детальный счётчик ↓ / ↑ в шторке",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = extendedNotificationStats,
+                            onCheckedChange = { checked ->
+                                scope.launch { settingsStore.saveExtendedNotificationStats(checked) }
+                            }
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
                     // Фоновая работа и батарея
                     Row(
                         modifier = Modifier
@@ -253,169 +266,20 @@ fun SettingsSheet(
                 }
             }
 
-            // Секция 4: Параметры обхода Белого Списка (qWDTT)
+            // Секция 4: Сеть и диагностика (тонкие настройки обхода теперь живут на главном экране)
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Column {
-                        Text(
-                            text = "Обход Белого Списка (qWDTT)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Настройки маскировки интернет-трафика под звонки VK",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "Сеть и диагностика",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                    // 1. Режим протокола обхода (Raw / WireGuard)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Режим протокола", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            FilterChip(
-                                selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
-                                onClick = {
-                                    scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_VPN) }
-                                },
-                                label = { Text("WireGuard (56000)", maxLines = 1) }
-                            )
-                            FilterChip(
-                                selected = connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN,
-                                onClick = {
-                                    scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_RAWTUN) }
-                                },
-                                label = { Text("Raw IP (56003)", maxLines = 1) }
-                            )
-                        }
-                        Text(
-                            text = if (connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN)
-                                "Raw IP: сырые пакеты напрямую в TUN без WireGuard. Максимальная маскировка при фильтрации."
-                            else
-                                "WireGuard: скоростной шифрованный туннель через VK TURN (DTLS). Быстрый стандартный режим.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // 2. Мощность (число параллельных потоков)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Мощность обхода", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                text = "$workersPerHash потоков",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            workerOptions.forEach { count ->
-                                FilterChip(
-                                    selected = workersPerHash == count,
-                                    onClick = { scope.launch { settingsStore.saveWorkersPerHash(count) } },
-                                    label = { Text("$count потоков") }
-                                )
-                            }
-                        }
-                        Text(
-                            text = if (hashCount > 1) {
-                                "Обнаружено $hashCount VK-хеша (максимум до ${hashCount * 27} потоков). Потоки распределяются поровну, сохраняя лимиты звонков VK."
-                            } else {
-                                "TURN-серверы VK выделяют сокеты пачками по 9 на сессию. 9 — 1 группа (стандарт), 18 — 2 группы (турбо), 27 — 3 группы (максимум для 1 хеша)."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // 3. Транспорт VK TURN (UDP / TCP)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Транспорт VK TURN", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            FilterChip(
-                                selected = turnTransport != SettingsStore.TURN_TRANSPORT_TCP,
-                                onClick = {
-                                    scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_UDP) }
-                                },
-                                label = { Text("UDP (Быстрый)", maxLines = 1) }
-                            )
-                            FilterChip(
-                                selected = turnTransport == SettingsStore.TURN_TRANSPORT_TCP,
-                                onClick = {
-                                    scope.launch { settingsStore.saveTurnTransport(SettingsStore.TURN_TRANSPORT_TCP) }
-                                },
-                                label = { Text("TCP 443 (Надёжный)", maxLines = 1) }
-                            )
-                        }
-                        Text(
-                            text = if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP)
-                                "TCP (443): передача трафика по TCP, полезно если оператор глушит нестандартный UDP."
-                            else
-                                "UDP: минимальный пинг и задержка при обычном обходе Белого Списка.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // 4. Авторизация VK (Анонимно / Аккаунт VK)
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Авторизация VK для обхода", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilterChip(
-                                selected = vkAuthMode == "anonymous",
-                                onClick = { scope.launch { settingsStore.saveVkAuthMode("anonymous") } },
-                                label = { Text("Анонимно") }
-                            )
-                            FilterChip(
-                                selected = vkAuthMode == "account",
-                                onClick = { scope.launch { settingsStore.saveVkAuthMode("account") } },
-                                label = { Text("Аккаунт VK") }
-                            )
-                        }
-                        Text(
-                            text = if (vkAuthMode == "account")
-                                "Аккаунт VK: вход через ваш профиль VK (меньше капч, потоки ограничены 4)."
-                            else
-                                "Анонимно: быстрое подключение без входа в аккаунт, до 27 потоков на хеш.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // 5. DNS резолвер
+                    // DNS резолвер
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text("DNS для подключения", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         Row(
@@ -442,13 +306,13 @@ fun SettingsSheet(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                    // 6. Подробные логи диагностики
+                    // Подробные логи диагностики
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                             Text("Подробный журнал диагностики", style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 "Показывать технические события DNS, RAW TUN и капчи",

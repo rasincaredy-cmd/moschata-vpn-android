@@ -681,7 +681,7 @@ class TunnelService : Service() {
                         // Старт ещё идёт (вход по аккаунту VK, DNS, капча…) — FGS нельзя убивать,
                         // иначе Android снимает уведомление и усыпляет приложение.
                         if (TunnelManager.isConnecting.value) {
-                            val connectingText = TunnelManager.stats.value.trim().ifEmpty { "Подключение..." }
+                            val connectingText = TunnelManager.notificationStats.value.trim().ifEmpty { "Подключение..." }
                             updateNotification(connectingText)
                             delay(2000)
                             continue
@@ -738,19 +738,17 @@ class TunnelService : Service() {
 
     private fun buildTunnelNotificationText(): String {
         val socks = TunnelManager.activeSocksListenAddress()
+        val notifText = TunnelManager.notificationStats.value.trim()
         if (socks != null) {
-            val statsText = TunnelManager.stats.value.trim()
             return when {
-                statsText.isEmpty() || statsText == "Ожидание данных..." || statsText.startsWith("SOCKS") ->
+                notifText.isEmpty() || notifText == "Ожидание данных..." || notifText.startsWith("SOCKS") ->
                     "SOCKS $socks"
-                else -> "$statsText · $socks"
+                else -> "$notifText · $socks"
             }
         }
-        val statsText = TunnelManager.stats.value.trim()
         return when {
-            statsText.isEmpty() -> "Туннель активен"
-            statsText == "Ожидание данных..." -> "Туннель активен"
-            else -> statsText
+            notifText.isEmpty() || notifText == "Ожидание данных..." -> "Туннель активен"
+            else -> notifText
         }
     }
 

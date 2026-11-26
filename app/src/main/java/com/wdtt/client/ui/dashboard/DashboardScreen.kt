@@ -102,6 +102,8 @@ fun DashboardScreen(
     val turnTransport by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = SettingsStore.TURN_TRANSPORT_UDP)
     val captchaMode by settingsStore.captchaMode.collectAsStateWithLifecycle(initialValue = "auto")
     val captchaSolveMethod by settingsStore.captchaSolveMethod.collectAsStateWithLifecycle(initialValue = "auto")
+    val turnTransportDefault by settingsStore.turnTransport.collectAsStateWithLifecycle(initialValue = SettingsStore.TURN_TRANSPORT_UDP)
+    var bypassSettingsExpanded by rememberSaveable { mutableStateOf(false) }
 
     val profiles by profilesStore.profiles.collectAsStateWithLifecycle(initialValue = emptyList())
     val subscriptions by profilesStore.subscriptions.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -361,39 +363,29 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 10.dp),
+                .padding(horizontal = 18.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // ═══ 1. Hero Connection Block ═══
+            // ═══ 1. Статус и Hero-кнопка (фиксированная высота зоны статуса — интерфейс не прыгает!) ═══
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                HeroConnectButton(
-                    visualState = visualState,
-                    onClick = {
-                        if (!hasActiveServer && !tunnelRunning) {
-                            Toast.makeText(context, "Сначала добавьте подписку", Toast.LENGTH_SHORT).show()
-                            showProfilesSheet = true
-                        } else {
-                            onToggleConnection()
-                        }
-                    }
-                )
-
+                // Верхний блок статуса в пустом месте НАД кнопкой (фиксированная высота 62.dp)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(62.dp)
                 ) {
                     Text(
                         text = when (visualState) {
-                            ConnectionVisualState.IDLE -> "Нажмите для подключения"
+                            ConnectionVisualState.IDLE -> "Готов к подключению"
                             ConnectionVisualState.CONNECTING -> "Установка соединения…"
                             ConnectionVisualState.CONNECTED_WIREGUARD -> "Защищено • Обычный VPN"
-                            ConnectionVisualState.CONNECTED_BYPASS -> "Защищено • Обход Белого Списка"
+                            ConnectionVisualState.CONNECTED_BYPASS -> "Защищено • Обход БС"
                             ConnectionVisualState.DISCONNECTING -> "Отключение…"
                         },
                         style = MaterialTheme.typography.titleMedium,
@@ -406,50 +398,96 @@ fun DashboardScreen(
                         }
                     )
 
-                    if (tunnelRunning) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                            ) {
-                                Text(
-                                    text = "Сессия: $formattedDuration",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
-                            }
-                            val speedBadge = remember(tunnelStats) {
-                                val afterFirst = tunnelStats.substringAfter("| ", "")
-                                val speedOnly = afterFirst.substringBefore(" |").trim()
-                                when {
-                                    speedOnly.startsWith("Скорость:", ignoreCase = true) ->
-                                        speedOnly.removePrefix("Скорость:").trim()
-                                    speedOnly.isNotBlank() -> speedOnly
-                                    else -> tunnelStats.substringBefore(" |").trim()
-                                }
-                            }
-                            if (speedBadge.isNotBlank() && !speedBadge.startsWith("Ожидание") && !speedBadge.startsWith("Подключение") && !speedBadge.startsWith("Активных")) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        when {
+                            tunnelRunning -> {
                                 Surface(
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                                 ) {
                                     Text(
-                                        text = speedBadge,
+                                        text = "Сессия: $formattedDuration",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                                val speedBadge = remember(tunnelStats) {
+                                    tunnelStats.split("|")
+                                        .map { it.trim() }
+                                        .firstOrNull { it.startsWith("↓") || it.startsWith("Трафик:") }
+                                        .orEmpty()
+                                }
+                                if (speedBadge.isNotBlank()) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                    ) {
+                                        Text(
+                                            text = speedBadge,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            tunnelConnecting -> {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFFFA726).copy(alpha = 0.16f)
+                                ) {
+                                    Text(
+                                        text = tunnelStats.takeIf {
+                                            it.isNotBlank() && !it.startsWith("RAW", ignoreCase = true)
+                                        } ?: "Ожидание ответа сервера…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFFFFB74D),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            else -> {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                ) {
+                                    val modeHint = when {
+                                        !hasActiveServer -> "Подписка не подключена"
+                                        selectedMode == DashboardVpnMode.BYPASS -> "Обход БС • VK TURN"
+                                        else -> "Обычный VPN • AmneziaWG"
+                                    }
+                                    Text(
+                                        text = modeHint,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                                     )
                                 }
                             }
                         }
                     }
                 }
+
+                HeroConnectButton(
+                    visualState = visualState,
+                    onClick = {
+                        if (!hasActiveServer && !tunnelRunning && !tunnelConnecting) {
+                            Toast.makeText(context, "Сначала добавьте подписку", Toast.LENGTH_SHORT).show()
+                            showProfilesSheet = true
+                        } else {
+                            onToggleConnection()
+                        }
+                    }
+                )
             }
 
             // ═══ 1b. Встроенный баннер ошибки подключения ═══
@@ -859,127 +897,169 @@ fun DashboardScreen(
 
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 
-                                    // Прохождение капчи VK
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            text = "Капча VK",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        FlowRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            val isManual = captchaMode == "wv" && captchaSolveMethod == "manual"
-                                            val isRjs = captchaMode == "rjs"
-                                            val isAuto = !isManual && !isRjs
-
-                                            FilterChip(
-                                                selected = isAuto,
-                                                onClick = {
-                                                    scope.launch {
-                                                        settingsStore.saveCaptchaMode("auto")
-                                                        settingsStore.saveCaptchaSolveMethod("auto")
-                                                    }
-                                                },
-                                                label = { Text("Авто") }
-                                            )
-                                            FilterChip(
-                                                selected = isManual,
-                                                onClick = {
-                                                    scope.launch {
-                                                        settingsStore.saveCaptchaMode("wv")
-                                                        settingsStore.saveCaptchaSolveMethod("manual")
-                                                    }
-                                                },
-                                                label = { Text("Вручную (окно)") }
-                                            )
-                                            FilterChip(
-                                                selected = isRjs,
-                                                onClick = {
-                                                    scope.launch {
-                                                        settingsStore.saveCaptchaMode("rjs")
-                                                    }
-                                                },
-                                                label = { Text("Без окна (Go)") }
-                                            )
-                                        }
+                                    // Компактный аккордеон тонких настроек обхода БС
+                                    val isManualCaptcha = captchaMode == "wv" && captchaSolveMethod == "manual"
+                                    val isRjsCaptcha = captchaMode == "rjs"
+                                    val captchaSummary = when {
+                                        isManualCaptcha -> "Ручная"
+                                        isRjsCaptcha -> "Без окна"
+                                        else -> "Авто"
                                     }
+                                    val protoSummary = if (connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN) "Raw IP" else "WG"
+                                    val transportSummary = if (turnTransportDefault == SettingsStore.TURN_TRANSPORT_TCP) "TCP 443" else "UDP"
 
-                                    // Мощность (число потоков)
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { bypassSettingsExpanded = !bypassSettingsExpanded }
+                                            .padding(vertical = 4.dp, horizontal = 2.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "Мощность потоков",
+                                                text = "Настройки обхода",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
-                                                text = "$workersPerHash потоков",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF9D4EDD)
+                                                text = "$captchaSummary капча · $workersPerHash потоков · $protoSummary ($transportSummary)",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFFCE93D8)
                                             )
                                         }
-                                        FlowRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            workerOptions.forEach { count ->
-                                                FilterChip(
-                                                    selected = workersPerHash == count,
-                                                    onClick = { scope.launch { settingsStore.saveWorkersPerHash(count) } },
-                                                    label = { Text("$count") }
-                                                )
-                                            }
-                                        }
+                                        Icon(
+                                            imageVector = if (bypassSettingsExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                            contentDescription = if (bypassSettingsExpanded) "Свернуть настройки" else "Развернуть настройки",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
 
-                                    // Протокол и транспорт обхода
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            text = "Режим обхода и транспорт",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        FlowRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            FilterChip(
-                                                selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
-                                                onClick = { scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_VPN) } },
-                                                label = { Text("WireGuard (56000)") }
-                                            )
-                                            FilterChip(
-                                                selected = connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN,
-                                                onClick = { scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_RAWTUN) } },
-                                                label = { Text("Raw IP (56003)") }
-                                            )
-                                            FilterChip(
-                                                selected = turnTransport == SettingsStore.TURN_TRANSPORT_TCP,
-                                                onClick = {
-                                                    val next = if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP) {
-                                                        SettingsStore.TURN_TRANSPORT_UDP
-                                                    } else {
-                                                        SettingsStore.TURN_TRANSPORT_TCP
-                                                    }
-                                                    scope.launch { settingsStore.saveTurnTransport(next) }
-                                                },
-                                                label = {
-                                                    Text(if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP) "TURN: TCP 443" else "TURN: UDP")
+                                    AnimatedVisibility(visible = bypassSettingsExpanded) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            // Прохождение капчи VK
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    text = "Капча VK",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                FlowRow(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    val isAuto = !isManualCaptcha && !isRjsCaptcha
+
+                                                    FilterChip(
+                                                        selected = isAuto,
+                                                        onClick = {
+                                                            scope.launch {
+                                                                settingsStore.saveCaptchaMode("auto")
+                                                                settingsStore.saveCaptchaSolveMethod("auto")
+                                                            }
+                                                        },
+                                                        label = { Text("Авто") }
+                                                    )
+                                                    FilterChip(
+                                                        selected = isManualCaptcha,
+                                                        onClick = {
+                                                            scope.launch {
+                                                                settingsStore.saveCaptchaMode("wv")
+                                                                settingsStore.saveCaptchaSolveMethod("manual")
+                                                            }
+                                                        },
+                                                        label = { Text("Вручную (окно)") }
+                                                    )
+                                                    FilterChip(
+                                                        selected = isRjsCaptcha,
+                                                        onClick = {
+                                                            scope.launch {
+                                                                settingsStore.saveCaptchaMode("rjs")
+                                                            }
+                                                        },
+                                                        label = { Text("Без окна (Go)") }
+                                                    )
                                                 }
-                                            )
+                                            }
+
+                                            // Мощность (число потоков)
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = "Мощность потоков",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        text = "$workersPerHash потоков",
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color(0xFF9D4EDD)
+                                                    )
+                                                }
+                                                FlowRow(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    workerOptions.forEach { count ->
+                                                        FilterChip(
+                                                            selected = workersPerHash == count,
+                                                            onClick = { scope.launch { settingsStore.saveWorkersPerHash(count) } },
+                                                            label = { Text("$count") }
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            // Протокол и транспорт обхода
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    text = "Режим обхода и транспорт",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                FlowRow(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    FilterChip(
+                                                        selected = connectionMode == SettingsStore.CONNECTION_MODE_VPN,
+                                                        onClick = { scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_VPN) } },
+                                                        label = { Text("WireGuard (56000)") }
+                                                    )
+                                                    FilterChip(
+                                                        selected = connectionMode == SettingsStore.CONNECTION_MODE_RAWTUN,
+                                                        onClick = { scope.launch { settingsStore.saveConnectionMode(SettingsStore.CONNECTION_MODE_RAWTUN) } },
+                                                        label = { Text("Raw IP (56003)") }
+                                                    )
+                                                    FilterChip(
+                                                        selected = turnTransport == SettingsStore.TURN_TRANSPORT_TCP,
+                                                        onClick = {
+                                                            val next = if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP) {
+                                                                SettingsStore.TURN_TRANSPORT_UDP
+                                                            } else {
+                                                                SettingsStore.TURN_TRANSPORT_TCP
+                                                            }
+                                                            scope.launch { settingsStore.saveTurnTransport(next) }
+                                                        },
+                                                        label = {
+                                                            Text(if (turnTransport == SettingsStore.TURN_TRANSPORT_TCP) "TURN: TCP 443" else "TURN: UDP")
+                                                        }
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }

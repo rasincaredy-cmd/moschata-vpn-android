@@ -19,11 +19,11 @@ android {
     compileSdk = 35
     
     defaultConfig {
-        applicationId = "net.qwdtt.client"
+        applicationId = "com.moschata.vpn"
         minSdk = 28
         targetSdk = 35
-        versionCode = 71
-        versionName = "1.6.14"
+        versionCode = 72
+        versionName = "1.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

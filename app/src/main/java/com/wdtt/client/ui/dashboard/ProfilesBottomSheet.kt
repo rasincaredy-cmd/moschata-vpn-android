@@ -79,6 +79,11 @@ fun ProfilesBottomSheet(
     val duplicateProfileNames = remember(sortedProfiles) {
         sortedProfiles.groupingBy { it.name.trim() }.eachCount().filterValues { it > 1 }.keys
     }
+    val phoneProfiles = remember(sortedProfiles) { sortedProfiles.filter { !it.isPcDevice } }
+    val pcProfiles = remember(sortedProfiles) { sortedProfiles.filter { it.isPcDevice } }
+    var showPcProfiles by remember(pcProfiles, currentProfileId) {
+        mutableStateOf(phoneProfiles.isEmpty() || pcProfiles.any { it.id == currentProfileId })
+    }
 
     fun selectProfile(target: ConnectionProfile) {
         val isYd = target.isYandexDocs || target.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
@@ -269,7 +274,8 @@ fun ProfilesBottomSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
                 ) {
-                    items(sortedProfiles, key = { it.id }) { profile ->
+                    val visibleProfiles = if (showPcProfiles) sortedProfiles else phoneProfiles
+                    items(visibleProfiles, key = { it.id }) { profile ->
                         val isSelected = profile.id == currentProfileId
                         val isWg = profile.isWireGuard || profile.protocolType == ConnectionProfile.PROTOCOL_WIREGUARD
                         val isYd = profile.isYandexDocs || profile.protocolType == ConnectionProfile.PROTOCOL_YANDEX_DOCS
@@ -437,6 +443,37 @@ fun ProfilesBottomSheet(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    if (pcProfiles.isNotEmpty()) {
+                        item(key = "pc_profiles_toggle") {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { showPcProfiles = !showPcProfiles }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "💻 Профили для компьютера (${pcProfiles.size})",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Icon(
+                                        imageVector = if (showPcProfiles) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                        contentDescription = if (showPcProfiles) "Скрыть" else "Показать",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }

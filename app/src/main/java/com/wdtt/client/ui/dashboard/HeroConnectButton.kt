@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +24,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 enum class ConnectionVisualState {
     IDLE,
@@ -139,8 +144,9 @@ fun HeroConnectButton(
                 }
             ),
             modifier = Modifier
-                .size(156.dp)
+                .size(152.dp)
                 .clip(CircleShape)
+                .semantics { contentDescription = "Подключение" }
                 .clickable(
                     enabled = enabled,
                     interactionSource = interactionSource,
@@ -150,8 +156,9 @@ fun HeroConnectButton(
                     onClick()
                 }
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxSize()
             ) {
                 Icon(
@@ -160,12 +167,29 @@ fun HeroConnectButton(
                         ConnectionVisualState.CONNECTED_WIREGUARD -> Icons.Filled.Shield
                         else -> Icons.Filled.PowerSettingsNew
                     },
-                    contentDescription = "Подключение",
+                    contentDescription = null,
                     tint = when (visualState) {
                         ConnectionVisualState.IDLE -> Color(0xFF9E9EA8)
                         else -> activeColor
                     },
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = when (visualState) {
+                        ConnectionVisualState.IDLE -> "ПОДКЛЮЧИТЬ"
+                        ConnectionVisualState.CONNECTING -> "ОТМЕНА"
+                        ConnectionVisualState.DISCONNECTING -> "ВЫХОД…"
+                        ConnectionVisualState.CONNECTED_WIREGUARD,
+                        ConnectionVisualState.CONNECTED_BYPASS -> "СТОП"
+                    },
+                    fontSize = 11.sp,
+                    letterSpacing = 0.8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when (visualState) {
+                        ConnectionVisualState.IDLE -> Color(0xFFB4B4C0)
+                        else -> activeColor
+                    }
                 )
             }
         }
